@@ -1,0 +1,11 @@
+.gradle/
+.tools/
+.local/
+local.properties
+**/build/
+*.jks
+*.keystore
+*.p12
+*credential*.xml
+.idea/
+artifacts/*.apk

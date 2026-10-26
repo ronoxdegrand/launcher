@@ -1,0 +1,4 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="140dp" android:minHeight="100dp" android:minResizeWidth="60dp" android:minResizeHeight="60dp"
+    android:resizeMode="horizontal|vertical" android:updatePeriodMillis="0" android:widgetCategory="home_screen"
+    android:initialLayout="@layout/fixture_widget" android:configure="dev.glgra.launcher.FixtureConfigActivity"/>

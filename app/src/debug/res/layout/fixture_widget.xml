@@ -1,0 +1,5 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:padding="12dp" android:background="#E6294747">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="A real Android widget" android:textColor="#FFFFFF" android:gravity="center" android:textSize="18sp"/>
+    <Button android:id="@+id/fixture_action" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Open settings" android:soundEffectsEnabled="false"/>
+</LinearLayout>

@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'dev.glgra.launcher'
+    compileSdk { version = release(37) { minorApiLevel = 2 } }
+    buildToolsVersion '37.0.0'
+    defaultConfig {
+        applicationId 'dev.glgra.launcher'
+        minSdk 34
+        targetSdk 37
+        versionCode Integer.parseInt(providers.environmentVariable('LAUNCHER_VERSION_CODE').getOrElse('2'))
+        versionName providers.environmentVariable('LAUNCHER_VERSION_NAME').getOrElse('0.2.0')
+        testInstrumentationRunner providers.gradleProperty('testRunner').getOrElse('dev.glgra.launcher.IntegrationTests')
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        if (providers.environmentVariable('LAUNCHER_STORE_FILE').isPresent()) {
+            personal {
+                storeFile file(providers.environmentVariable('LAUNCHER_STORE_FILE').get())
+                storePassword providers.environmentVariable('LAUNCHER_STORE_PASSWORD').get()
+                keyAlias providers.environmentVariable('LAUNCHER_KEY_ALIAS').get()
+                keyPassword providers.environmentVariable('LAUNCHER_KEY_PASSWORD').get()
+            }
+        }
+    }
+    buildTypes { release { minifyEnabled false; if (signingConfigs.findByName('personal') != null) signingConfig signingConfigs.personal } }
+}
