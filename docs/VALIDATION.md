@@ -2,7 +2,7 @@
 
 ## Current preview
 
-Package `dev.glgra.launcher`, version 0.2.1 (code 2001); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 170,729 bytes (approximately 167 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
+Package `dev.glgra.launcher`, version 0.2.2 (code 2002); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 181,009 bytes (approximately 177 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
 
 `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 22 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
 
@@ -50,3 +50,5 @@ Dock and search now share a four-column AppTile component. The dock rectangle ex
 The integrated suite passes with system blur enabled and again with system blur confirmed disabled (`Blur enabled: false`), followed by restoration of the emulator setting. It checks measured dock/search column alignment, a horizontal default row, visible result names, the blur availability contract and clearing blur/restoring the dock on close. Real dock/search drags now force a metadata refresh while the finger is held and pass: touch targets are retained until the gesture finishes. This identifies and fixes the intermittent tile-detachment failure noted in the earlier preview.
 
 Final debug build and lint pass: 0 errors, 23 warnings. Modern screenshots and both test logs are in `artifacts/modern-*`. A short Home idle rendering check again reports zero frames after five seconds; no physical-device performance claim is made. Public system backdrop blur is used for the drawer; in-canvas surfaces and the dock retain cached wallpaper-color glass.
+
+The [v0.2.2 release workflow](https://github.com/ronoxdegrand/launcher/actions/runs/40348724422) completed successfully. Its published 181,009-byte APK independently verifies against the pinned signing identity and checksum `76bf3e384cfc38191de726eae51f934d2ab1e099328348a73885dafff8fb408d`. The earlier v0.2.1 updater test remains historical evidence; v0.2.2 is the current UI build.

@@ -1,1 +1,1 @@
-ba44fceb5a6f218ac35c968d42c1c9f25d9b9eb98876a8455c379eaefab5cf55  launcher.apk
+76bf3e384cfc38191de726eae51f934d2ab1e099328348a73885dafff8fb408d  launcher.apk
