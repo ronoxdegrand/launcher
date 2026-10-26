@@ -62,12 +62,14 @@ jobs:
           echo "LAUNCHER_VERSION_NAME=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
           echo "LAUNCHER_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Install pinned Android SDK packages
         shell: bash
