@@ -68,6 +68,6 @@ final class SettingsPanel extends LinearLayout {
     private void section(String label){TextView title=heading(label,20);title.setPadding(0,Glass.dp(getContext(),28),0,Glass.dp(getContext(),10));}
     private TextView heading(String text,int size){TextView view=new TextView(getContext());view.setText(text);view.setTextSize(size);view.setTextColor(Glass.ink(getContext()));addView(view);return view;}
     private TextView note(String text){TextView view=heading(text,14);view.setPadding(0,Glass.dp(getContext(),10),0,Glass.dp(getContext(),12));return view;}
-    private Button button(String label,Runnable action){Button button=new Button(getContext());button.setText(label);button.setAllCaps(false);button.setSoundEffectsEnabled(false);button.setOnClickListener(v->action.run());addView(button,new LinearLayout.LayoutParams(-1,-2));return button;}
+    private Button button(String label,Runnable action){Button button=new Button(getContext());button.setText(label);button.setAllCaps(false);button.setTextColor(Glass.ink(getContext()));button.setTextSize(14);button.setMinHeight(Glass.dp(getContext(),52));Glass.control(button);button.setOnClickListener(v->action.run());LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,-2);row.topMargin=Glass.dp(getContext(),6);row.bottomMargin=Glass.dp(getContext(),6);addView(button,row);return button;}
     void close(){closed=true;updates.close();loader.shutdownNow();}
 }

@@ -204,10 +204,18 @@ public final class IntegrationTests extends Instrumentation {
         catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
     private void drawer(HomeActivity home) {
+        saveDesignShot("modern-home");
+        int[] dockCenters=new int[4];
+        main(()->{LinearLayout dock=(LinearLayout)home.bottom.getChildAt(1);for(int i=0;i<4;i++){View tile=dock.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);dockCenters[i]=point[0]+tile.getWidth()/2;}});
         main(() -> home.openDrawer(true));
         awaitUi(() -> home.drawer.isOpen() && home.drawer.search.hasFocus(), 5000, "Drawer search did not receive focus");
         awaitUi(() -> home.drawer.getRootWindowInsets() != null && home.drawer.getRootWindowInsets().isVisible(WindowInsets.Type.ime()), 6000, "Soft keyboard did not open");
         AppCatalog.Entry target = home.catalog.all().get(0);
+        awaitUi(()->(Float)field(home,"drawerReveal")>=.999f,5000,"Dock expansion animation did not finish");
+        main(()->{LinearLayout strip=field(home.drawer,"results");check(strip.getOrientation()==LinearLayout.HORIZONTAL&&strip.getChildCount()==4,"Empty search preserves a horizontal four-app dock");
+            int top=-1;for(int i=0;i<4;i++){View tile=strip.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);check(Math.abs(point[0]+tile.getWidth()/2-dockCenters[i])<=2,"Search app retains its dock column");if(top<0)top=point[1];check(point[1]==top,"All default results share a horizontal row");check(tile instanceof AppTile&&((AppTile)tile).title.getAlpha()==1,"Search result names are revealed");}
+            check(((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)!=0)==Glass.blurAvailable(home),"Backdrop blur follows Android support/state");});
+        saveDesignShot("modern-search");
         main(() -> { home.drawer.search.setText(target.label); check(home.drawer.isOpen(), "Typing keeps drawer open");
             LinearLayout results = field(home.drawer, "results"); check(findText(results, target.label, false) != null, "Search shows matching installed app");
             home.drawer.search.setText(""); home.drawer.search.onEditorAction(EditorInfo.IME_ACTION_GO); check(home.drawer.isOpen(), "Enter with empty query does nothing");
@@ -218,6 +226,7 @@ public final class IntegrationTests extends Instrumentation {
             TextView more = findText(categories, "+", true);
             if (more != null) { more.performClick(); check(!((String) field(home.drawer, "expanded")).isEmpty(), "Category expands inline"); }
             home.closeDrawer(); check(!home.drawer.isOpen() && home.drawer.getVisibility() == View.GONE, "Drawer closes");
+            check((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)==0&&home.bottom.getAlpha()==1,"Closing restores clear Home and dock");
             check(home.drawer.search.getText().toString().isEmpty() && ((String) field(home.drawer, "expanded")).isEmpty(), "Closing resets query and category expansion");
         });
         passed("Drawer search/focus/IME, empty Enter, keyboard-dismissed categories and reset-on-close");
@@ -301,6 +310,7 @@ public final class IntegrationTests extends Instrumentation {
         });
         traceNativeDrag(home, source, entry, "before DOWN", point[0], point[1]);
         long down = SystemClock.uptimeMillis(); nativeInput(MotionEvent.ACTION_DOWN, down, point[0], point[1]);
+        main(()->{if(home.drawer.isOpen())home.drawer.refresh();else invoke(home,"renderDock");check(source.isAttachedToWindow(),"Metadata refresh must preserve the tile under the held finger");});
         // A real elapsed hold triggers Android's long press; forged event timestamps do not.
         SystemClock.sleep(80);
         traceNativeDrag(home, source, entry, "80ms after DOWN", point[0], point[1]);
@@ -352,6 +362,13 @@ public final class IntegrationTests extends Instrumentation {
     private void diagnostic(String message) {
         report.append("DIAG ").append(message).append('\n');
         Bundle update = new Bundle(); update.putString("stream", "DIAG " + message + "\n"); sendStatus(0, update);
+    }
+    private void saveDesignShot(String name) {
+        waitForIdleSync();android.graphics.Bitmap screenshot=getUiAutomation().takeScreenshot();
+        check(screenshot!=null,"Design screenshot available");
+        try{java.io.File directory=getTargetContext().getExternalFilesDir("design");check(directory!=null&&(directory.isDirectory()||directory.mkdirs()),"Design evidence directory");
+            try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(directory,name+".png"))){check(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out),"Design screenshot saved");}
+        }catch(IOException failure){throw new AssertionError(failure);}finally{screenshot.recycle();}
     }
     private void traceNativeDrag(HomeActivity home, View source, AppCatalog.Entry entry, String phase, float x, float y) {
         main(() -> {

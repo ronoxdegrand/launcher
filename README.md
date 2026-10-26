@@ -7,7 +7,7 @@ A widget-first launcher for Android 14 and later, built with native Android view
 Install signed `launcher.apk` from [GitHub Releases](https://github.com/ronoxdegrand/launcher/releases). The installed Launcher icon opens Settings; **Open Home** previews the canvas. Select it as the default Home app through Android.
 
 - Swipe horizontally on the continuous four-column, six-row canvas. It snaps to columns and remembers its position.
-- Swipe up or tap Search for the drawer and keyboard. Dismiss the keyboard to browse categories. Back closes the drawer.
+- Swipe up or tap Search: the dock expands into a horizontal result strip and rises with the keyboard. Swipe sideways for additional matches. Dismiss the keyboard to browse categories. Back closes the drawer.
 - Long-press empty Home to edit. Add widgets/apps, move and resize items, or scroll down to settings.
 - Long-press apps for native shortcuts, pinning, Add to Home and App Info. Continue dragging to place an app on Home; drop one app onto another to create a folder.
 - Usage access enables adaptive ranking; notification access enables read-only notification previews. Both are optional. Hidden apps remain searchable by name.
@@ -22,7 +22,7 @@ No analytics, accounts or cloud sync. Usage summaries stay local. Notifications 
 
 ## Acceptance status
 
-This is a development preview. No Galaxy S23 was connected during implementation. Assistant query forwarding is omitted pending proof that the selected assistant accepts text. Samsung pairs require One UI to deliver a standard pinned shortcut. One UI privileged navigation animation parity is outside the public API contract. Android wallpaper restrictions require cached blurred wallpaper-color surfaces, rather than photograph blur. Badges count active notification records, not messages within a record.
+This is a development preview. No Galaxy S23 was connected during implementation. Assistant query forwarding is omitted pending proof that the selected assistant accepts text. Samsung pairs require One UI to deliver a standard pinned shortcut. One UI privileged navigation animation parity is outside the public API contract. The drawer uses system backdrop blur when Android enables it, with a more opaque fallback when blur is unavailable. In-canvas surfaces and the dock use cached wallpaper-color glass; ordinary Android apps cannot read wallpaper pixels for photographic per-view blur. Badges count active notification records, not messages within a record.
 
 See [integration findings](docs/INTEGRATIONS.md), [validation](docs/VALIDATION.md), and [device acceptance checks](docs/DEVICE-CHECKS.md).
 

@@ -27,3 +27,11 @@ Evidence reviewed 2026-10-26. “API supported” is not a claim that the Galaxy
 - [UsageStatsManager retention and access](https://developer.android.com/reference/android/app/usage/UsageStatsManager#queryEvents(long,long))
 - [Android app signing](https://developer.android.com/studio/publish/app-signing)
 - [Android 17 SDK setup](https://developer.android.com/about/versions/17/setup-sdk) and [AGP 9.4 compatibility](https://developer.android.com/build/releases/agp-9-4-0-release-notes)
+
+## Modern surfaces and dock transition · 0.2.2
+
+The dock and search results share AppTile dimensions and four visible columns. Opening the drawer expands a clipped, rounded dock rectangle into the full sheet; names fade in without moving the icon columns. The results strip stays immediately above the IME and follows WindowInsetsAnimation progress. Additional search matches scroll horizontally. Closing reverses the surface reveal, and animation-disabled mode sets the final state directly.
+
+The drawer requests public FLAG_BLUR_BEHIND with a fixed 28dp radius while open and applies a 14dp RenderEffect only to the underlying Home canvas. WindowManager blur availability is observed; the drawer becomes more opaque and Home effects are cleared when blur is disabled. No wallpaper pixels, screenshots of other apps, hidden APIs or new permissions are used. Dock and in-canvas glass retain a cached wallpaper-color fallback. The blur flags/effect are removed on closing; no frame loop runs while idle.
+
+Reference: [Android public window blur guidelines](https://source.android.com/docs/core/display/window-blurs).

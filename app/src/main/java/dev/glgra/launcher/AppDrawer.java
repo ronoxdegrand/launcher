@@ -2,6 +2,7 @@ package dev.glgra.launcher;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Rect;
 import android.view.*;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -9,7 +10,7 @@ import android.widget.*;
 import android.text.*;
 import java.util.*;
 
-/** One drawer for the search button, home swipe and tracked dock gesture. */
+/** The dock expands into one sheet; its four columns remain the search-result geometry. */
 final class AppDrawer extends FrameLayout {
     interface Actions {
         void launch(AppCatalog.Entry entry);
@@ -23,65 +24,65 @@ final class AppDrawer extends FrameLayout {
     private final Actions actions;
     private final LinearLayout results, categories;
     private final ScrollView scrolling;
-    private boolean keyboard, opened;
+    private final HorizontalScrollView resultStrip;
+    private final LinearLayout header;
+    private boolean keyboard, opened, browsing, touching, refreshPending, closing;
     private String expanded = "";
-    private float downY, downX;
+    private float downY, downX, reveal=1;
+    private final Rect dockBounds=new Rect(),revealBounds=new Rect();
+    private final ViewOutlineProvider revealOutline=new ViewOutlineProvider(){public void getOutline(View view,android.graphics.Outline outline){outline.setRoundRect(revealBounds,dp(28)*(1-reveal));}};
     private boolean startedAtTop, directionLocked, downward, dismissing, contextActive;
     private final int touchSlop;
     AppDrawer(Context context, AppCatalog catalog, UsageRepository usage, Actions actions) {
-        super(context); this.catalog=catalog;this.usage=usage;this.actions=actions;
-        touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();
-        Glass.applySquare(this);setSoundEffectsEnabled(false);
-        LinearLayout body=new LinearLayout(context);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(16),dp(8),dp(16),dp(12));
-        TextView handle=new TextView(context);handle.setText("⌄");handle.setTextColor(Glass.ink(context));handle.setGravity(Gravity.CENTER);handle.setSoundEffectsEnabled(false);
-        handle.setOnClickListener(v->actions.close());body.addView(handle,new LinearLayout.LayoutParams(-1,dp(32)));
-        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setTextSize(20);search.setSoundEffectsEnabled(false);
-        search.setImeOptions(EditorInfo.IME_ACTION_GO);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        search.setPadding(dp(18),dp(8),dp(18),dp(8));Glass.apply(search);body.addView(search,new LinearLayout.LayoutParams(-1,dp(56)));
-        scrolling=new ScrollView(context);scrolling.setVerticalScrollBarEnabled(false);LinearLayout content=new LinearLayout(context);content.setOrientation(LinearLayout.VERTICAL);
-        results=new LinearLayout(context);results.setOrientation(LinearLayout.VERTICAL);content.addView(results);
-        categories=new LinearLayout(context);categories.setOrientation(LinearLayout.VERTICAL);content.addView(categories);
-        scrolling.addView(content);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));addView(body,new FrameLayout.LayoutParams(-1,-1));
-        search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){refresh();}public void afterTextChanged(Editable e){}});
+        super(context);this.catalog=catalog;this.usage=usage;this.actions=actions;
+        touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();Glass.applySquare(this);setSoundEffectsEnabled(false);
+        LinearLayout body=new LinearLayout(context);body.setOrientation(LinearLayout.VERTICAL);
+        header=new LinearLayout(context);header.setGravity(Gravity.CENTER);
+        View handle=new View(context);android.graphics.drawable.GradientDrawable pill=new android.graphics.drawable.GradientDrawable();pill.setColor(Glass.dark(context)?0x66FFFFFF:0x55314350);pill.setCornerRadius(dp(3));handle.setBackground(pill);
+        header.addView(handle,new LinearLayout.LayoutParams(dp(34),dp(4)));header.setContentDescription("Close apps");header.setOnClickListener(v->actions.close());body.addView(header,new LinearLayout.LayoutParams(-1,dp(32)));
+        scrolling=new ScrollView(context);scrolling.setVerticalScrollBarEnabled(false);scrolling.setClipToPadding(false);scrolling.setPadding(dp(12),0,dp(12),dp(12));
+        categories=new LinearLayout(context);categories.setOrientation(LinearLayout.VERTICAL);scrolling.addView(categories);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout cluster=new LinearLayout(context);cluster.setOrientation(LinearLayout.VERTICAL);cluster.setPadding(dp(12),0,dp(12),dp(10));
+        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setHintTextColor(Glass.dark(context)?0xAADDDFE9:0xAA344354);search.setTextSize(16);search.setSoundEffectsEnabled(false);
+        search.setImeOptions(EditorInfo.IME_ACTION_GO);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        search.setPadding(dp(18),0,dp(18),0);Glass.control(search);cluster.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
+        resultStrip=new HorizontalScrollView(context);resultStrip.setHorizontalScrollBarEnabled(false);resultStrip.setOverScrollMode(OVER_SCROLL_NEVER);
+        results=new LinearLayout(context);results.setOrientation(LinearLayout.HORIZONTAL);resultStrip.addView(results,new HorizontalScrollView.LayoutParams(-2,-2));cluster.addView(resultStrip,new LinearLayout.LayoutParams(-1,-2));body.addView(cluster);addView(body,new FrameLayout.LayoutParams(-1,-1));
+        resultStrip.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)sizeResults();});
+        search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){resultStrip.scrollTo(0,0);refresh();}public void afterTextChanged(Editable e){}});
         search.setOnEditorActionListener((v,action,event)->{
-            if(action==EditorInfo.IME_ACTION_GO || event!=null && event.getKeyCode()==KeyEvent.KEYCODE_ENTER && event.getAction()==KeyEvent.ACTION_UP){
-                if(search.getText().toString().isBlank())return true;
-                List<AppCatalog.Entry> matches=catalog.search(search.getText().toString(),usage);
-                if(!matches.isEmpty())actions.launch(matches.get(0));
-                return true;
+            if(action==EditorInfo.IME_ACTION_GO||event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_UP){
+                if(search.getText().toString().isBlank())return true;List<AppCatalog.Entry> matches=catalog.search(search.getText().toString(),usage);if(!matches.isEmpty())actions.launch(matches.get(0));return true;
             }return false;
         });
-        search.setOnFocusChangeListener((v,focused)->refresh());
-        setOnApplyWindowInsetsListener((view,insets)->{
-            boolean shown=insets.isVisible(WindowInsets.Type.ime());
-            int bottom=insets.getInsets(WindowInsets.Type.ime()).bottom;
-            android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
-            setPadding(safe.left,safe.top,safe.right,Math.max(safe.bottom,shown?bottom:0));
-            if(keyboard!=shown){keyboard=shown;refresh();}return insets;
+        search.setOnFocusChangeListener((v,focused)->{if(opened&&!closing){browsing=!focused;updatePresentation();}});
+        setOnApplyWindowInsetsListener((view,insets)->{applyInsets(insets);boolean shown=insets.isVisible(WindowInsets.Type.ime());
+            if(keyboard&&!shown&&opened&&!closing)browsing=true;keyboard=shown;if(shown&&!closing)browsing=false;updatePresentation();return insets;});
+        setWindowInsetsAnimationCallback(new WindowInsetsAnimation.Callback(WindowInsetsAnimation.Callback.DISPATCH_MODE_CONTINUE_ON_SUBTREE){
+            @Override public WindowInsets onProgress(WindowInsets insets,List<WindowInsetsAnimation> running){applyInsets(insets);return insets;}
         });
         setVisibility(GONE);
     }
-    void open(boolean focus){opened=true;setVisibility(VISIBLE);refresh();if(focus)postDelayed(()->{
-        if(opened){search.requestFocus();getContext().getSystemService(InputMethodManager.class).showSoftInput(search,InputMethodManager.SHOW_IMPLICIT);}
-    },ValueAnimator.areAnimatorsEnabled()?180:0);}
-    void reset(){opened=false;android.transition.TransitionManager.endTransitions(categories);getContext().getSystemService(InputMethodManager.class).hideSoftInputFromWindow(getWindowToken(),0);search.clearFocus();search.setText("");expanded="";contextActive=false;dismissing=false;scrolling.scrollTo(0,0);setVisibility(GONE);}
+    private void applyInsets(WindowInsets insets){android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());int ime=insets.getInsets(WindowInsets.Type.ime()).bottom;setPadding(safe.left,safe.top,safe.right,Math.max(safe.bottom,ime));}
+    void open(boolean focus){boolean wasOpen=opened;opened=true;closing=false;browsing=false;setVisibility(VISIBLE);if(!wasOpen)refresh();else updatePresentation();if(focus)post(()->{if(opened&&!closing){search.requestFocus();getContext().getSystemService(InputMethodManager.class).showSoftInput(search,InputMethodManager.SHOW_IMPLICIT);}});}
+    void hideKeyboard(){closing=true;getContext().getSystemService(InputMethodManager.class).hideSoftInputFromWindow(getWindowToken(),0);}
+    void reset(){opened=false;touching=false;contextActive=false;refreshPending=false;android.transition.TransitionManager.endTransitions(categories);hideKeyboard();search.clearFocus();search.setText("");expanded="";dismissing=false;browsing=false;scrolling.scrollTo(0,0);resultStrip.scrollTo(0,0);setClipBounds(null);setVisibility(GONE);}
     boolean isOpen(){return opened;}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);if(opened)setReveal(reveal,dockBounds);}
+    void setReveal(float amount,Rect origin){reveal=Math.max(0,Math.min(1,amount));dockBounds.set(origin);float remaining=1-reveal;revealBounds.set(Math.round(origin.left*remaining),Math.round(origin.top*remaining),Math.round(getWidth()+(origin.right-getWidth())*remaining),Math.round(getHeight()+(origin.bottom-getHeight())*remaining));setClipBounds(revealBounds);setOutlineProvider(revealOutline);invalidateOutline();header.setAlpha(reveal);scrolling.setAlpha(reveal);for(int i=0;i<results.getChildCount();i++)if(results.getChildAt(i)instanceof AppTile)((AppTile)results.getChildAt(i)).title.setAlpha(reveal);}
+    void updateGlass(){Glass.applySquare(this);setOutlineProvider(revealOutline);}
+    private void sizeResults(){int cell=Math.max(dp(64),resultStrip.getWidth()/4);for(int i=0;i<results.getChildCount();i++){View child=results.getChildAt(i);android.view.ViewGroup.LayoutParams lp=child.getLayoutParams();lp.width=child instanceof AppTile?cell:Math.max(cell,resultStrip.getWidth());child.setLayoutParams(lp);}}
+    private void updatePresentation(){if(closing)return;scrolling.setVisibility(browsing?VISIBLE:INVISIBLE);if(browsing&&categories.getChildCount()==0)buildCategories();}
     void refresh(){
-        results.removeAllViews();categories.removeAllViews();
-        String query=search.getText().toString();
-        Map<String,Integer> counts=NotificationRepository.counts();
+        if(touching||contextActive){refreshPending=true;return;}refreshPending=false;
+        results.removeAllViews();categories.removeAllViews();String query=search.getText().toString();Map<String,Integer> counts=NotificationRepository.counts();
         for(AppCatalog.Entry entry:catalog.search(query,usage)){
-            if(query.isBlank() && results.getChildCount()==4)break;
-            LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(6),dp(8),dp(6),dp(8));
-            row.addView(icon(entry),new LinearLayout.LayoutParams(dp(48),dp(48)));TextView name=label(entry.label,16);name.setPadding(dp(16),0,0,0);
-            row.addView(name,new LinearLayout.LayoutParams(0,-2,1));int count=counts.getOrDefault(entry.packageName,0);
-            if(count>0)row.addView(label(String.valueOf(count),14));
-            row.setSoundEffectsEnabled(false);row.setOnClickListener(v->actions.launch(entry));row.setOnLongClickListener(v->{showContext(v,entry);return true;});actions.bindDrag(row,entry);results.addView(row);
+            if(query.isBlank()&&results.getChildCount()==4)break;
+            AppTile tile=new AppTile(getContext(),entry,counts.getOrDefault(entry.packageName,0),true);tile.title.setAlpha(reveal);
+            tile.setOnClickListener(v->actions.launch(entry));tile.setOnLongClickListener(v->{showContext(v,entry);return true;});actions.bindDrag(tile,entry);results.addView(tile,new LinearLayout.LayoutParams(Math.max(dp(64),resultStrip.getWidth()/4),-2));
         }
-        if(!query.isBlank() && results.getChildCount()==0)results.addView(label("No apps found",16));
-        // Assistant query forwarding remains disabled until a supported route is verified on the user's assistant.
-        boolean reveal=!keyboard || !search.hasFocus();
-        results.setVisibility(reveal?GONE:VISIBLE);categories.setVisibility(reveal?VISIBLE:GONE);if(reveal)buildCategories();
+        if(!query.isBlank()&&results.getChildCount()==0){TextView empty=label("No apps found",14);empty.setGravity(Gravity.CENTER);results.addView(empty,new LinearLayout.LayoutParams(Math.max(dp(200),resultStrip.getWidth()),dp(88)));}
+        updatePresentation();
     }
     private void buildCategories(){
         Map<String,List<AppCatalog.Entry>> groups=new LinkedHashMap<>();
@@ -128,13 +129,15 @@ final class AppDrawer extends FrameLayout {
     private TextView label(String text,int size){TextView view=new TextView(getContext());view.setText(text);view.setTextSize(size);view.setTextColor(Glass.ink(getContext()));view.setSoundEffectsEnabled(false);return view;}
     private int dp(int value){return Glass.dp(getContext(),value);}
     @Override public boolean dispatchTouchEvent(MotionEvent event){
-        if(event.getActionMasked()==MotionEvent.ACTION_DOWN){downY=event.getY();downX=event.getX();startedAtTop=scrolling.getScrollY()==0;directionLocked=false;downward=false;dismissing=false;contextActive=false;}
+        if(event.getActionMasked()==MotionEvent.ACTION_DOWN){contextActive=false;touching=false;if(refreshPending)refresh();touching=true;downY=event.getY();downX=event.getX();startedAtTop=scrolling.getScrollY()==0;directionLocked=false;downward=false;dismissing=false;}
         if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&!contextActive){
             float dx=event.getX()-downX,dy=event.getY()-downY;
             if(!directionLocked&&Math.max(Math.abs(dx),Math.abs(dy))>touchSlop){directionLocked=true;downward=dy>0&&dy>Math.abs(dx);}
             if(startedAtTop&&directionLocked&&downward)super.requestDisallowInterceptTouchEvent(false);
         }
-        return super.dispatchTouchEvent(event);
+        boolean handled=super.dispatchTouchEvent(event);
+        if(event.getActionMasked()==MotionEvent.ACTION_UP||event.getActionMasked()==MotionEvent.ACTION_CANCEL){touching=false;if(refreshPending&&!contextActive)post(this::refresh);}
+        return handled;
     }
     @Override public void requestDisallowInterceptTouchEvent(boolean disallow){
         // Keep the chance to claim a downward dismissal before ScrollView locks its own drag.

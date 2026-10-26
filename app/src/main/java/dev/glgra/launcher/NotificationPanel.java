@@ -63,7 +63,7 @@ public final class NotificationPanel extends ScrollView {
         GradientDrawable surface = new GradientDrawable();
         surface.setColor(dark() ? 0xCF20292B : 0xDDF5F8F7); surface.setCornerRadius(dp(22)); setBackground(surface);
         body = new LinearLayout(context); body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(14), dp(16), dp(14), dp(16));
+        body.setPadding(dp(20), dp(24), dp(20), dp(24));
         addView(body, new ScrollView.LayoutParams(-1, -2));
         String[] quiet = {"Suspiciously peaceful.", "All caught up. Allegedly.", "Nothing to see here. A rare achievement.", "The apps are behaving. For now."};
         emptyMessage = quiet[new java.util.Random().nextInt(quiet.length)];
@@ -99,9 +99,9 @@ public final class NotificationPanel extends ScrollView {
         if (disposed || (isAttachedToWindow() && getWindowVisibility() != View.VISIBLE)) return;
         int oldScroll = getScrollY(); body.removeAllViews(); mediaViews.clear();
         if (!NotificationRepository.accessGranted(getContext())) {
-            body.addView(text("Keep your notifications here, without opening or dismissing them.", 16));
-            Button access = new Button(getContext()); access.setText("Allow notification access"); access.setAllCaps(false);
-            access.setSoundEffectsEnabled(false); access.setOnClickListener(v -> {
+            body.addView(text("Your notifications, at a glance.", 16));
+            Button access = new Button(getContext()); access.setText("Enable notification previews"); access.setAllCaps(false);
+            access.setTextColor(Glass.ink(getContext()));access.setTextSize(14);Glass.control(access); access.setOnClickListener(v -> {
                 try { getContext().startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
                 catch (android.content.ActivityNotFoundException ignored) { }
             }); body.addView(access); return;

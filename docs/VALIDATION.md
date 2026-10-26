@@ -42,3 +42,11 @@ After rendering counters were reset and the current app was left idle for five s
 No Galaxy S23 is connected. Samsung/Google real widgets, One UI navigation/animation behavior, Samsung pair delivery, assistant prefilled text, API-specific live updates, notification privacy, long-term usage patterns and physical-device performance remain pending. No measured battery or memory claim is made. Assistant forwarding is omitted until verified; Samsung pairs use only standard pin requests where available.
 
 Android 14 restricts wallpaper pixels for ordinary launchers. Glass surfaces use cached blurred wallpaper colors as an explicit fallback. Full photographic wallpaper blur is not claimed. The dock retains four slots; fewer than four eligible installed apps leave empty slots rather than duplicating or revealing hidden apps.
+
+## UI update · 0.2.2
+
+Dock and search now share a four-column AppTile component. The dock rectangle expands in both dimensions, rounded corners settle into the full drawer sheet, app names fade in, and the horizontal result strip follows keyboard insets. Extra matches scroll horizontally. Back/early-release reverse the reveal; disabled system animations use final states directly. Controls, surfaces and badges have consistent rounded styling and quieter colors.
+
+The integrated suite passes with system blur enabled and again with system blur confirmed disabled (`Blur enabled: false`), followed by restoration of the emulator setting. It checks measured dock/search column alignment, a horizontal default row, visible result names, the blur availability contract and clearing blur/restoring the dock on close. Real dock/search drags now force a metadata refresh while the finger is held and pass: touch targets are retained until the gesture finishes. This identifies and fixes the intermittent tile-detachment failure noted in the earlier preview.
+
+Final debug build and lint pass: 0 errors, 23 warnings. Modern screenshots and both test logs are in `artifacts/modern-*`. A short Home idle rendering check again reports zero frames after five seconds; no physical-device performance claim is made. Public system backdrop blur is used for the drawer; in-canvas surfaces and the dock retain cached wallpaper-color glass.

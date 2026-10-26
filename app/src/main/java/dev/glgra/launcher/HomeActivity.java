@@ -27,6 +27,10 @@ public final class HomeActivity extends Activity {
     private boolean wasStopped;
     private GridModel.Item resizeSelection;
     private long lastMetadataLoad;
+    private android.animation.ValueAnimator drawerMotion;
+    private float drawerReveal;
+    private boolean touchingDock,dockRefreshPending;
+    private final java.util.function.Consumer<Boolean> blurChanged=enabled->{if(drawer!=null){drawer.updateGlass();Glass.backdrop(getWindow(),canvas,drawer.isOpen());}};
     private final Runnable notificationChanged=()->{renderDock();updateFolderBadges();if(drawer!=null&&drawer.isOpen())drawer.refresh();};
     private final LauncherApps.Callback packages=new LauncherApps.Callback(){
         public void onPackageRemoved(String p,UserHandle u){refreshApps(true);} public void onPackageAdded(String p,UserHandle u){refreshApps(true);}
@@ -46,31 +50,31 @@ public final class HomeActivity extends Activity {
         root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());root.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});
         canvas=new HomeCanvas(this,model,store);canvas.onEdit=this::enterEditing;canvas.onSwipeUp=()->openDrawer(true);
         root.addView(canvas,new LinearLayout.LayoutParams(-1,0,1));
-        bottom=new DockSurface();bottom.setOrientation(LinearLayout.VERTICAL);Glass.apply(bottom);root.addView(bottom);
+        bottom=new DockSurface();bottom.setOrientation(LinearLayout.VERTICAL);Glass.apply(bottom);LinearLayout.LayoutParams dockParams=new LinearLayout.LayoutParams(-1,-2);dockParams.setMargins(dp(12),0,dp(12),dp(10));root.addView(bottom,dockParams);
         stage.addView(root,new FrameLayout.LayoutParams(-1,-1));
         drawer=new AppDrawer(this,catalog,usage,new AppDrawer.Actions(){
             public void launch(AppCatalog.Entry entry){closeDrawer();launchEntry(entry);}
             public void context(View source,AppCatalog.Entry entry){appMenu(source,entry,null);}
             public void bindDrag(View source,AppCatalog.Entry entry){enableDragTouch(source,new DragPayload(null,entry));}
-            public void close(){closeDrawer();}
+            public void close(){animateDrawer(false);}
         });
         stage.addView(drawer,new FrameLayout.LayoutParams(-1,-1));setContentView(stage);
         getWindow().getInsetsController().setSystemBarsAppearance(Glass.dark(this)?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,()->{
             if(folderPopup!=null&&folderPopup.isShowing())folderPopup.dismiss();else if(contextPopup!=null&&contextPopup.isShowing())contextPopup.dismiss();
-            else if(drawer.isOpen())closeDrawer();else if(canvas.editing)setEditing(false);
+            else if(drawer.isOpen())animateDrawer(false);else if(canvas.editing)setEditing(false);
         });
         getSystemService(LauncherApps.class).registerCallback(packages,new Handler(Looper.getMainLooper()));
         NotificationRepository.addListener(notificationChanged);render();renderDock();refreshApps(true);UpdateRepository.schedule(this);
         handlePin(getIntent());
         if(store.prefs.getBoolean("returnNotifications",false)&&model.notification()!=null)canvas.post(()->{canvas.setPosition(0);canvas.persistPosition();});
     }
-    @Override protected void onStart(){super.onStart();host.startListening();}
+    @Override protected void onStart(){super.onStart();host.startListening();getWindowManager().addCrossWindowBlurEnabledListener(blurChanged);}
     @Override protected void onResume(){super.onResume();if(store!=null){
         model.reserveNotifications(store.prefs.getBoolean("notificationsEnabled",true),store.prefs.getInt("notificationWidth",3));store.save(model);render();refreshApps(false);
         if(wasStopped&&store.prefs.getBoolean("returnNotifications",false)&&model.notification()!=null)canvas.post(()->{canvas.setPosition(0);canvas.persistPosition();});wasStopped=false;
     }}
-    @Override protected void onStop(){wasStopped=true;canvas.persistPosition();host.stopListening();if(notificationPanel!=null)notificationPanel.reset();if(folderPopup!=null)folderPopup.dismiss();if(drawer.isOpen())closeDrawer();super.onStop();}
+    @Override protected void onStop(){wasStopped=true;getWindowManager().removeCrossWindowBlurEnabledListener(blurChanged);canvas.persistPosition();host.stopListening();if(notificationPanel!=null)notificationPanel.reset();if(folderPopup!=null)folderPopup.dismiss();if(drawer.isOpen())closeDrawer();super.onStop();}
     @Override protected void onDestroy(){NotificationRepository.removeListener(notificationChanged);getSystemService(LauncherApps.class).unregisterCallback(packages);if(notificationPanel!=null)notificationPanel.dispose();if(editingSettings!=null)editingSettings.close();loader.shutdownNow();super.onDestroy();}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handlePin(intent);
     }
@@ -162,28 +166,44 @@ public final class HomeActivity extends Activity {
         if(item.kind.equals("shortcut"))getSystemService(LauncherApps.class).startShortcut(component.getPackageName(),item.shortcutId,null,null,android.os.Process.myUserHandle());
         else getSystemService(LauncherApps.class).startMainActivity(component,android.os.Process.myUserHandle(),null,null);
     }catch(RuntimeException e){toast("This app or shortcut is unavailable.");}}
-    private void renderDock(){if(bottom==null||catalog==null)return;bottom.removeAllViews();
-        Button search=button("Search",()->openDrawer(true));search.setTextSize(12);search.setPadding(0,0,0,0);search.setMinHeight(0);search.setBackgroundColor(Color.TRANSPARENT);search.setStateListAnimator(null);search.setElevation(0);bottom.addView(search,new LinearLayout.LayoutParams(-1,dp(32)));
-        LinearLayout dock=new LinearLayout(this);List<AppCatalog.Entry> entries=catalog.dock(usage);
+    private void renderDock(){if(bottom==null||catalog==null)return;if(touchingDock||contextGesture){dockRefreshPending=true;return;}dockRefreshPending=false;bottom.removeAllViews();
+        Button search=button("Search apps",()->openDrawer(true));search.setTextSize(14);search.setTextColor(Glass.ink(this));search.setPadding(0,0,0,0);search.setMinHeight(0);search.setBackgroundColor(Color.TRANSPARENT);search.setStateListAnimator(null);search.setElevation(0);bottom.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
+        LinearLayout dock=new LinearLayout(this);List<AppCatalog.Entry> entries=catalog.dock(usage);Map<String,Integer> counts=NotificationRepository.counts();
         for(int i=0;i<4;i++){
-            FrameLayout slot=new FrameLayout(this);if(i<entries.size()){
-                AppCatalog.Entry entry=entries.get(i);ImageView icon=new ImageView(this);icon.setImageDrawable(entry.icon);icon.setPadding(dp(14),dp(8),dp(14),dp(8));icon.setContentDescription(entry.label);icon.setSoundEffectsEnabled(false);
-                slot.addView(icon,new FrameLayout.LayoutParams(-1,-1));icon.setOnClickListener(v->launchEntry(entry));icon.setOnLongClickListener(v->{appMenu(v,entry,null);return true;});enableDragTouch(icon,new DragPayload(null,entry));
-                int count=NotificationRepository.counts().getOrDefault(entry.packageName,0);if(count>0){TextView badge=text(String.valueOf(count));badge.setTextSize(12);badge.setBackgroundColor(0xFFC6E8DF);FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(dp(25),dp(25),Gravity.TOP|Gravity.RIGHT);slot.addView(badge,bp);}
-            }dock.addView(slot,new LinearLayout.LayoutParams(0,dp(64),1));
-        }bottom.addView(dock);
+            View tile;if(i<entries.size()){
+                AppCatalog.Entry entry=entries.get(i);tile=new AppTile(this,entry,counts.getOrDefault(entry.packageName,0),false);
+                tile.setOnClickListener(v->launchEntry(entry));tile.setOnLongClickListener(v->{appMenu(v,entry,null);return true;});enableDragTouch(tile,new DragPayload(null,entry));
+            }else tile=new View(this);
+            dock.addView(tile,new LinearLayout.LayoutParams(0,-1,1));
+        }bottom.addView(dock,new LinearLayout.LayoutParams(-1,dp(88)));
     }
-    void openDrawer(boolean keyboard){if(canvas.editing)setEditing(false);if(folderPopup!=null)folderPopup.dismiss();drawer.open(keyboard);drawer.bringToFront();drawer.setTranslationY(stage.getHeight());if(android.animation.ValueAnimator.areAnimatorsEnabled())drawer.animate().translationY(0).setDuration(180).start();else drawer.setTranslationY(0);}
-    void closeDrawer(){drawer.animate().cancel();drawer.reset();drawer.setTranslationY(0);contextGesture=false;}
+    private void beginDrawer(){
+        if(canvas.editing)setEditing(false);if(folderPopup!=null)folderPopup.dismiss();
+        drawer.open(false);drawer.bringToFront();drawer.updateGlass();bottom.setAlpha(0);Glass.backdrop(getWindow(),canvas,true);
+    }
+    private Rect dockBounds(){int[] origin=new int[2],parent=new int[2];bottom.getLocationOnScreen(origin);stage.getLocationOnScreen(parent);return new Rect(origin[0]-parent[0],origin[1]-parent[1],origin[0]-parent[0]+bottom.getWidth(),origin[1]-parent[1]+bottom.getHeight());}
+    private void revealDrawer(float amount){drawerReveal=amount;drawer.setReveal(amount,dockBounds());}
+    void openDrawer(boolean keyboard){
+        if(drawer.isOpen()){if(keyboard)drawer.open(true);return;}beginDrawer();revealDrawer(0);animateDrawer(true);if(keyboard)drawer.open(true);
+    }
+    private void animateDrawer(boolean opening){
+        if(drawerMotion!=null)drawerMotion.cancel();if(opening&&!drawer.isOpen())beginDrawer();
+        if(!opening)drawer.hideKeyboard();float target=opening?1:0;
+        if(!android.animation.ValueAnimator.areAnimatorsEnabled()){revealDrawer(target);if(!opening)closeDrawer();return;}
+        drawerMotion=android.animation.ValueAnimator.ofFloat(drawerReveal,target);drawerMotion.setDuration(Math.max(80,Math.round(300*Math.abs(target-drawerReveal))));
+        drawerMotion.setInterpolator(new android.view.animation.PathInterpolator(.2f,0,0,1));drawerMotion.addUpdateListener(a->revealDrawer((float)a.getAnimatedValue()));
+        drawerMotion.addListener(new android.animation.AnimatorListenerAdapter(){boolean cancelled;public void onAnimationCancel(android.animation.Animator a){cancelled=true;}public void onAnimationEnd(android.animation.Animator a){if(!cancelled&&!opening)closeDrawer();}});drawerMotion.start();
+    }
+    void closeDrawer(){if(drawerMotion!=null){drawerMotion.cancel();drawerMotion=null;}drawer.reset();drawerReveal=0;drawer.setTranslationY(0);bottom.setAlpha(1);Glass.backdrop(getWindow(),canvas,false);contextGesture=false;}
     private final class DockSurface extends LinearLayout{
         float x,y;boolean tracking;
         DockSurface(){super(HomeActivity.this);}
+        @Override public boolean dispatchTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN)touchingDock=true;boolean result=super.dispatchTouchEvent(e);if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){touchingDock=false;if(dockRefreshPending&&!contextGesture)post(()->renderDock());}return result;}
         @Override public boolean onInterceptTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN){x=e.getX();y=e.getY();tracking=false;}
-            if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&!contextGesture&&y-e.getY()>dp(10)&&y-e.getY()>Math.abs(x-e.getX())){tracking=true;drawer.open(false);drawer.bringToFront();return true;}return tracking;}
-        @Override public boolean onTouchEvent(MotionEvent e){if(!tracking)return true;float amount=Math.min(1,Math.max(0,(y-e.getY())/(stage.getHeight()*.45f)));
-            drawer.setTranslationY(stage.getHeight()*(1-amount));if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){tracking=false;if(amount>.35f){drawer.animate().translationY(0).setDuration(android.animation.ValueAnimator.areAnimatorsEnabled()?160:0).withEndAction(()->drawer.open(true)).start();}else closeDrawer();}return true;}
-    }
-    private void appMenu(View source,AppCatalog.Entry entry,GridModel.Item homeItem){
+            if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&!contextGesture&&y-e.getY()>dp(10)&&y-e.getY()>Math.abs(x-e.getX())){tracking=true;beginDrawer();return true;}return tracking;}
+        @Override public boolean onTouchEvent(MotionEvent e){if(!tracking)return true;float amount=Math.min(1,Math.max(0,(y-e.getY())/(stage.getHeight()*.45f)));revealDrawer(amount);
+            if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){tracking=false;boolean complete=e.getActionMasked()!=MotionEvent.ACTION_CANCEL&&amount>.35f;animateDrawer(complete);if(complete)drawer.open(true);}return true;}
+    }    private void appMenu(View source,AppCatalog.Entry entry,GridModel.Item homeItem){
         if(entry==null){if(homeItem!=null)itemMenu(homeItem);return;}
         if(contextPopup!=null)contextPopup.dismiss();contextGesture=true;canvas.manipulating=true;
         LinearLayout menu=new LinearLayout(this);menu.setOrientation(LinearLayout.VERTICAL);Glass.apply(menu);menu.setPadding(dp(12),dp(8),dp(12),dp(8));
@@ -195,7 +215,7 @@ public final class HomeActivity extends Activity {
         menu.addView(button("Add to Home",()->{contextPopup.dismiss();addHome(entry);enterEditing();}));
         if(homeItem!=null)menu.addView(button("Remove from Home",()->{removeItem(homeItem);contextPopup.dismiss();}));
         menu.addView(button("App Info",()->{contextPopup.dismiss();startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+entry.packageName)));}));
-        contextPopup=new PopupWindow(menu,dp(250),-2,false);contextPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));contextPopup.setOutsideTouchable(true);contextPopup.setOnDismissListener(()->{contextGesture=false;canvas.manipulating=false;});contextPopup.showAsDropDown(source);
+        contextPopup=new PopupWindow(menu,dp(250),-2,false);contextPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));contextPopup.setOutsideTouchable(true);contextPopup.setOnDismissListener(()->{contextGesture=false;canvas.manipulating=false;if(dockRefreshPending)bottom.post(()->renderDock());});contextPopup.showAsDropDown(source);
         Haptics.tick(source,store.prefs.getInt("haptics",2));
     }
     private List<String> pinKeys(){List<String> keys=new ArrayList<>();try{org.json.JSONArray json=new org.json.JSONArray(store.prefs.getString("dockPins","[]"));for(int i=0;i<json.length();i++)keys.add(json.getString(i));}catch(org.json.JSONException ignored){}return keys;}
@@ -330,7 +350,7 @@ public final class HomeActivity extends Activity {
     }
     Button button(String label, Runnable action) {
         Button button = new Button(this); button.setText(label); button.setAllCaps(false); button.setSoundEffectsEnabled(false);
-        button.setOnClickListener(v -> action.run()); return button;
+        button.setTextColor(Glass.ink(this));Glass.control(button);button.setOnClickListener(v -> action.run()); return button;
     }
     int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
