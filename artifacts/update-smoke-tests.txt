@@ -1,0 +1,13 @@
+Downloading the real stable release from https://github.com/ronoxdegrand/launcher
+PASS Real GitHub release downloaded over Wi-Fi and SHA-256 verified
+PASS Actual APK package, higher version, supported SDK and installed signing identity validated
+PASS Native install confirmation reached in com.android.packageinstaller; installation was not accepted
+
+Installed: 0.1.999 (code 1999)
+Updater status: v0.1.999 → v0.2.1
+PASS Real GitHub release downloaded over Wi-Fi and SHA-256 verified
+Candidate: 0.2.1 (code 2001) · 170729 bytes
+PASS Actual APK package, higher version, supported SDK and installed signing identity validated
+PASS Native install confirmation reached in com.android.packageinstaller; installation was not accepted
+All real-release updater smoke tests passed. Verified APK retained for manual installation.
+

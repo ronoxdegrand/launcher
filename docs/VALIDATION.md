@@ -2,7 +2,7 @@
 
 ## Current preview
 
-Package `dev.glgra.launcher`, version 0.2.0; minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is approximately 167 KiB. Gradle distribution checksum and the public signing certificate fingerprint are pinned.
+Package `dev.glgra.launcher`, version 0.2.1 (code 2001); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 170,729 bytes (approximately 167 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
 
 `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 22 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
 
@@ -29,7 +29,13 @@ A private stable RSA4096 signing identity is stored outside Git and outside the 
 
 The updater binds checksum/APK requests and redirects to the selected validated Wi-Fi network, bounds downloads, checks SHA-256 and Android package metadata/signature, fsyncs the file, and durably commits a pointer to an immutable verified APK. Previous verified downloads survive replacement failure; unreferenced files are pruned after checks. Cancellation resets displayed work state. Installation requires an explicit tap and Android consent.
 
-GitHub workflow execution, real public asset download and native installer smoke results are recorded below when completed; local signing alone does not prove that whole chain.
+The tag-triggered [v0.2.1 workflow](https://github.com/ronoxdegrand/launcher/actions/runs/40308029554) completed successfully: clean Linux build, lint, signing, pinned-certificate verification and public APK/checksum publication. The initial v0.2.0 attempt failed before compilation because the old Android setup action requested the removed `tools` package; v0.2.1 uses the current action with explicit platform-tools.
+
+A disposable older signed install, 0.1.999/code 1999, downloaded the actual public v0.2.1/code 2001 APK over Wi-Fi. Instrumentation verified its SHA-256, package, supported SDK, higher version and matching installed certificate, then reached Android packageinstaller with an enabled Update button. The test did not accept installation. A subsequent `adb install -r` of the independently downloaded public APK succeeded, and Settings/Home reopened as 0.2.1. This proves the download-to-consent path and a compatible APK replacement; clicking the native confirmation and checking a real S23 update remain device acceptance work.
+
+Public APK SHA-256: `ba44fceb5a6f218ac35c968d42c1c9f25d9b9eb98876a8455c379eaefab5cf55`. Signature and updater results are in `artifacts/signature-current.txt` and `artifacts/update-smoke-tests.txt`.
+
+After rendering counters were reset and the current app was left idle for five seconds, the API 34 emulator reported **0 rendered frames**. This is a short rendering observation, not a CPU/GPU/battery or physical-device performance measurement. See `artifacts/idle-rendering-current.txt`.
 
 ## Remaining device acceptance
 

@@ -102,7 +102,7 @@ jobs:
         shell: bash
         run: |
           gh release create "$RELEASE_TAG" artifacts/launcher.apk artifacts/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --generate-notes --verify-tag --latest
+            --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --notes-file app/src/main/assets/CHANGELOG.md --verify-tag --latest
 
       - name: Remove temporary signing key
         if: always()
