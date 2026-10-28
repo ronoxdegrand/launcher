@@ -35,3 +35,7 @@ The dock and search results share AppTile dimensions and four visible columns. O
 The drawer requests public FLAG_BLUR_BEHIND with a fixed 28dp radius while open and applies a 14dp RenderEffect only to the underlying Home canvas. WindowManager blur availability is observed; the drawer becomes more opaque and Home effects are cleared when blur is disabled. No wallpaper pixels, screenshots of other apps, hidden APIs or new permissions are used. Dock and in-canvas glass retain a cached wallpaper-color fallback. The blur flags/effect are removed on closing; no frame loop runs while idle.
 
 Reference: [Android public window blur guidelines](https://source.android.com/docs/core/display/window-blurs).
+
+## Regional blur update · 0.2.3
+
+The earlier wallpaper-color fallback is replaced on Home by public, non-focusable and non-touchable TYPE_APPLICATION_MEDIA child windows behind the activity. Their background blur regions follow the notification panel's visible rectangle and the dock including navigation-bar space. Window.setBackgroundBlurRadius supplies the actual backdrop pixels; the main views contain only a neutral translucent tint. The parent activity keeps normal lifecycle behaviour. Child windows are hidden on Home stop/drawer opening/blur disable, repositioned only on layout/scroll changes, and dismissed on destruction. This requires no system-overlay permission or wallpaper-pixel access. Android/One UI can still disable compositor blur, so a neutral readable fallback remains necessary.

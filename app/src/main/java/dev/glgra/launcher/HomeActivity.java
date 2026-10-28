@@ -24,13 +24,14 @@ public final class HomeActivity extends Activity {
     private LinearLayout editingControls;
     private PopupWindow contextPopup,folderPopup;
     private boolean contextGesture,loading;
-    private boolean wasStopped;
+    private boolean wasStopped,foreground;
+    SurfaceBlur surfaceBlurs;
     private GridModel.Item resizeSelection;
     private long lastMetadataLoad;
     private android.animation.ValueAnimator drawerMotion;
     private float drawerReveal;
     private boolean touchingDock,dockRefreshPending;
-    private final java.util.function.Consumer<Boolean> blurChanged=enabled->{if(drawer!=null){drawer.updateGlass();Glass.backdrop(getWindow(),canvas,drawer.isOpen());}};
+    private final java.util.function.Consumer<Boolean> blurChanged=enabled->{if(drawer!=null){drawer.updateGlass();Glass.backdrop(getWindow(),canvas,drawer.isOpen());Glass.applyDock(bottom);if(notificationPanel!=null)Glass.applyNotifications(notificationPanel);if(surfaceBlurs!=null)surfaceBlurs.sync();}};
     private final Runnable notificationChanged=()->{renderDock();updateFolderBadges();if(drawer!=null&&drawer.isOpen())drawer.refresh();};
     private final LauncherApps.Callback packages=new LauncherApps.Callback(){
         public void onPackageRemoved(String p,UserHandle u){refreshApps(true);} public void onPackageAdded(String p,UserHandle u){refreshApps(true);}
@@ -38,7 +39,7 @@ public final class HomeActivity extends Activity {
         public void onPackagesUnavailable(String[] p,UserHandle u,boolean r){refreshApps(true);}
     };
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);getWindow().setDecorFitsSystemWindows(false);
+        super.onCreate(saved);getWindow().setDecorFitsSystemWindows(false);getWindow().setNavigationBarContrastEnforced(false);getWindow().setNavigationBarColor(Color.TRANSPARENT);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         store=new LayoutStore(this);model=store.load();catalog=new AppCatalog(this);usage=new UsageRepository(this);
         model.reserveNotifications(store.prefs.getBoolean("notificationsEnabled",true),store.prefs.getInt("notificationWidth",3));store.save(model);
@@ -47,10 +48,10 @@ public final class HomeActivity extends Activity {
         Set<Integer> ids=new HashSet<>();for(GridModel.Item i:model.items)if(i.isWidget())ids.add(i.widgetId);
         for(int id:host.getAppWidgetIds())if(!ids.contains(id)&&id!=pendingId)host.deleteAppWidgetId(id);
         stage=new FrameLayout(this);root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
-        root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());root.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});
+        root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());root.setPadding(bars.left,bars.top,bars.right,0);bottom.setPadding(dp(12),0,dp(12),bars.bottom);return insets;});
         canvas=new HomeCanvas(this,model,store);canvas.onEdit=this::enterEditing;canvas.onSwipeUp=()->openDrawer(true);
         root.addView(canvas,new LinearLayout.LayoutParams(-1,0,1));
-        bottom=new DockSurface();bottom.setOrientation(LinearLayout.VERTICAL);Glass.apply(bottom);LinearLayout.LayoutParams dockParams=new LinearLayout.LayoutParams(-1,-2);dockParams.setMargins(dp(12),0,dp(12),dp(10));root.addView(bottom,dockParams);
+        bottom=new DockSurface();bottom.setOrientation(LinearLayout.VERTICAL);Glass.applyDock(bottom);LinearLayout.LayoutParams dockParams=new LinearLayout.LayoutParams(-1,-2);dockParams.setMargins(0,0,0,0);root.addView(bottom,dockParams);
         stage.addView(root,new FrameLayout.LayoutParams(-1,-1));
         drawer=new AppDrawer(this,catalog,usage,new AppDrawer.Actions(){
             public void launch(AppCatalog.Entry entry){closeDrawer();launchEntry(entry);}
@@ -58,7 +59,7 @@ public final class HomeActivity extends Activity {
             public void bindDrag(View source,AppCatalog.Entry entry){enableDragTouch(source,new DragPayload(null,entry));}
             public void close(){animateDrawer(false);}
         });
-        stage.addView(drawer,new FrameLayout.LayoutParams(-1,-1));setContentView(stage);
+        stage.addView(drawer,new FrameLayout.LayoutParams(-1,-1));setContentView(stage);getWindow().setNavigationBarContrastEnforced(false);surfaceBlurs=new SurfaceBlur(this,stage,bottom,()->notificationPanel);
         getWindow().getInsetsController().setSystemBarsAppearance(Glass.dark(this)?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,()->{
             if(folderPopup!=null&&folderPopup.isShowing())folderPopup.dismiss();else if(contextPopup!=null&&contextPopup.isShowing())contextPopup.dismiss();
@@ -69,14 +70,14 @@ public final class HomeActivity extends Activity {
         handlePin(getIntent());
         if(store.prefs.getBoolean("returnNotifications",false)&&model.notification()!=null)canvas.post(()->{canvas.setPosition(0);canvas.persistPosition();});
     }
-    @Override protected void onStart(){super.onStart();host.startListening();getWindowManager().addCrossWindowBlurEnabledListener(blurChanged);}
+    @Override protected void onStart(){super.onStart();foreground=true;host.startListening();surfaceBlurs.active(true);getWindowManager().addCrossWindowBlurEnabledListener(blurChanged);}
     @Override protected void onResume(){super.onResume();if(store!=null){
         model.reserveNotifications(store.prefs.getBoolean("notificationsEnabled",true),store.prefs.getInt("notificationWidth",3));store.save(model);render();refreshApps(false);
         if(wasStopped&&store.prefs.getBoolean("returnNotifications",false)&&model.notification()!=null)canvas.post(()->{canvas.setPosition(0);canvas.persistPosition();});wasStopped=false;
     }}
-    @Override protected void onStop(){wasStopped=true;getWindowManager().removeCrossWindowBlurEnabledListener(blurChanged);canvas.persistPosition();host.stopListening();if(notificationPanel!=null)notificationPanel.reset();if(folderPopup!=null)folderPopup.dismiss();if(drawer.isOpen())closeDrawer();super.onStop();}
-    @Override protected void onDestroy(){NotificationRepository.removeListener(notificationChanged);getSystemService(LauncherApps.class).unregisterCallback(packages);if(notificationPanel!=null)notificationPanel.dispose();if(editingSettings!=null)editingSettings.close();loader.shutdownNow();super.onDestroy();}
-    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handlePin(intent);
+    @Override protected void onStop(){foreground=false;wasStopped=true;surfaceBlurs.active(false);getWindowManager().removeCrossWindowBlurEnabledListener(blurChanged);canvas.persistPosition();host.stopListening();if(notificationPanel!=null)notificationPanel.reset();if(folderPopup!=null)folderPopup.dismiss();if(contextPopup!=null)contextPopup.dismiss();contextGesture=false;if(!canvas.moveMode)canvas.manipulating=false;if(drawer.isOpen())closeDrawer();super.onStop();}
+    @Override protected void onDestroy(){if(contextPopup!=null)contextPopup.dismiss();if(folderPopup!=null)folderPopup.dismiss();surfaceBlurs.close();NotificationRepository.removeListener(notificationChanged);getSystemService(LauncherApps.class).unregisterCallback(packages);if(notificationPanel!=null)notificationPanel.dispose();if(editingSettings!=null)editingSettings.close();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(Intent.ACTION_MAIN.equals(intent.getAction())&&intent.hasCategory(Intent.CATEGORY_HOME)){if(folderPopup!=null)folderPopup.dismiss();if(contextPopup!=null)contextPopup.dismiss();if(drawer.isOpen())closeDrawer();if(canvas.editing)setEditing(false);}else handlePin(intent);
     }
     private void refreshApps(boolean metadata){
         if(loading||loader.isShutdown())return;loading=true;
@@ -87,7 +88,7 @@ public final class HomeActivity extends Activity {
         if(notificationPanel!=null){notificationPanel.dispose();notificationPanel=null;}
         canvas.removeAllViews();
         for(GridModel.Item item:model.items){View view;
-            if(item.isNotification()){notificationPanel=new NotificationPanel(this);Glass.apply(notificationPanel);view=notificationPanel;}
+            if(item.isNotification()){notificationPanel=new NotificationPanel(this);Glass.applyNotifications(notificationPanel);view=notificationPanel;}
             else if(item.isWidget())view=widgetView(item);
             else if(item.isFolder())view=folderView(item);
             else view=shortcutView(item,false);
@@ -167,7 +168,7 @@ public final class HomeActivity extends Activity {
         else getSystemService(LauncherApps.class).startMainActivity(component,android.os.Process.myUserHandle(),null,null);
     }catch(RuntimeException e){toast("This app or shortcut is unavailable.");}}
     private void renderDock(){if(bottom==null||catalog==null)return;if(touchingDock||contextGesture){dockRefreshPending=true;return;}dockRefreshPending=false;bottom.removeAllViews();
-        Button search=button("Search apps",()->openDrawer(true));search.setTextSize(14);search.setTextColor(Glass.ink(this));search.setPadding(0,0,0,0);search.setMinHeight(0);search.setBackgroundColor(Color.TRANSPARENT);search.setStateListAnimator(null);search.setElevation(0);bottom.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
+        Button search=button("Search apps",()->openDrawer(true,true));search.setTextSize(14);search.setTextColor(Glass.ink(this));search.setPadding(0,0,0,0);search.setMinHeight(0);search.setBackgroundColor(Color.TRANSPARENT);search.setStateListAnimator(null);search.setElevation(0);bottom.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
         LinearLayout dock=new LinearLayout(this);List<AppCatalog.Entry> entries=catalog.dock(usage);Map<String,Integer> counts=NotificationRepository.counts();
         for(int i=0;i<4;i++){
             View tile;if(i<entries.size()){
@@ -177,14 +178,16 @@ public final class HomeActivity extends Activity {
             dock.addView(tile,new LinearLayout.LayoutParams(0,-1,1));
         }bottom.addView(dock,new LinearLayout.LayoutParams(-1,dp(88)));
     }
-    private void beginDrawer(){
+    private void beginDrawer(){beginDrawer(false);}
+    private void beginDrawer(boolean searchOnly){
         if(canvas.editing)setEditing(false);if(folderPopup!=null)folderPopup.dismiss();
-        drawer.open(false);drawer.bringToFront();drawer.updateGlass();bottom.setAlpha(0);Glass.backdrop(getWindow(),canvas,true);
+        drawer.open(false,searchOnly);drawer.bringToFront();drawer.updateGlass();bottom.setAlpha(0);if(surfaceBlurs!=null)surfaceBlurs.active(false);Glass.backdrop(getWindow(),canvas,true);
     }
     private Rect dockBounds(){int[] origin=new int[2],parent=new int[2];bottom.getLocationOnScreen(origin);stage.getLocationOnScreen(parent);return new Rect(origin[0]-parent[0],origin[1]-parent[1],origin[0]-parent[0]+bottom.getWidth(),origin[1]-parent[1]+bottom.getHeight());}
     private void revealDrawer(float amount){drawerReveal=amount;drawer.setReveal(amount,dockBounds());}
-    void openDrawer(boolean keyboard){
-        if(drawer.isOpen()){if(keyboard)drawer.open(true);return;}beginDrawer();revealDrawer(0);animateDrawer(true);if(keyboard)drawer.open(true);
+    void openDrawer(boolean keyboard){openDrawer(keyboard,false);}
+    void openDrawer(boolean keyboard,boolean searchOnly){
+        if(drawer.isOpen()){if(keyboard)drawer.open(true);return;}beginDrawer(searchOnly);revealDrawer(0);animateDrawer(true);if(keyboard)drawer.open(true);
     }
     private void animateDrawer(boolean opening){
         if(drawerMotion!=null)drawerMotion.cancel();if(opening&&!drawer.isOpen())beginDrawer();
@@ -194,7 +197,7 @@ public final class HomeActivity extends Activity {
         drawerMotion.setInterpolator(new android.view.animation.PathInterpolator(.2f,0,0,1));drawerMotion.addUpdateListener(a->revealDrawer((float)a.getAnimatedValue()));
         drawerMotion.addListener(new android.animation.AnimatorListenerAdapter(){boolean cancelled;public void onAnimationCancel(android.animation.Animator a){cancelled=true;}public void onAnimationEnd(android.animation.Animator a){if(!cancelled&&!opening)closeDrawer();}});drawerMotion.start();
     }
-    void closeDrawer(){if(drawerMotion!=null){drawerMotion.cancel();drawerMotion=null;}drawer.reset();drawerReveal=0;drawer.setTranslationY(0);bottom.setAlpha(1);Glass.backdrop(getWindow(),canvas,false);contextGesture=false;}
+    void closeDrawer(){if(drawerMotion!=null){drawerMotion.cancel();drawerMotion=null;}drawer.reset();drawerReveal=0;drawer.setTranslationY(0);bottom.setAlpha(1);if(surfaceBlurs!=null)surfaceBlurs.active(foreground);Glass.backdrop(getWindow(),canvas,false);contextGesture=false;}
     private final class DockSurface extends LinearLayout{
         float x,y;boolean tracking;
         DockSurface(){super(HomeActivity.this);}
@@ -345,7 +348,7 @@ public final class HomeActivity extends Activity {
     }
     TextView text(String content) {
         TextView text = new TextView(this); text.setText(content); text.setGravity(Gravity.CENTER);
-        text.setTextColor((getResources().getConfiguration().uiMode & 0x30) == 0x20 ? Color.WHITE : Color.BLACK);
+        text.setTextColor(Glass.ink(this));text.setShadowLayer(dp(2),0,dp(1),0xAA000000);
         text.setSoundEffectsEnabled(false); return text;
     }
     Button button(String label, Runnable action) {

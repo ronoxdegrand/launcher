@@ -26,7 +26,7 @@ final class AppDrawer extends FrameLayout {
     private final ScrollView scrolling;
     private final HorizontalScrollView resultStrip;
     private final LinearLayout header;
-    private boolean keyboard, opened, browsing, touching, refreshPending, closing;
+    private boolean keyboard, opened, browsing, touching, refreshPending, closing, searchOnly;
     private String expanded = "";
     private float downY, downX, reveal=1;
     private final Rect dockBounds=new Rect(),revealBounds=new Rect();
@@ -38,16 +38,16 @@ final class AppDrawer extends FrameLayout {
         touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();Glass.applySquare(this);setSoundEffectsEnabled(false);
         LinearLayout body=new LinearLayout(context);body.setOrientation(LinearLayout.VERTICAL);
         header=new LinearLayout(context);header.setGravity(Gravity.CENTER);
-        View handle=new View(context);android.graphics.drawable.GradientDrawable pill=new android.graphics.drawable.GradientDrawable();pill.setColor(Glass.dark(context)?0x66FFFFFF:0x55314350);pill.setCornerRadius(dp(3));handle.setBackground(pill);
+        View handle=new View(context);android.graphics.drawable.GradientDrawable pill=new android.graphics.drawable.GradientDrawable();pill.setColor(0x66FFFFFF);pill.setCornerRadius(dp(3));handle.setBackground(pill);
         header.addView(handle,new LinearLayout.LayoutParams(dp(34),dp(4)));header.setContentDescription("Close apps");header.setOnClickListener(v->actions.close());body.addView(header,new LinearLayout.LayoutParams(-1,dp(32)));
         scrolling=new ScrollView(context);scrolling.setVerticalScrollBarEnabled(false);scrolling.setClipToPadding(false);scrolling.setPadding(dp(12),0,dp(12),dp(12));
-        categories=new LinearLayout(context);categories.setOrientation(LinearLayout.VERTICAL);scrolling.addView(categories);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));
+        categories=new LinearLayout(context);categories.setOrientation(LinearLayout.VERTICAL);scrolling.addView(categories);
         LinearLayout cluster=new LinearLayout(context);cluster.setOrientation(LinearLayout.VERTICAL);cluster.setPadding(dp(12),0,dp(12),dp(10));
-        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setHintTextColor(Glass.dark(context)?0xAADDDFE9:0xAA344354);search.setTextSize(16);search.setSoundEffectsEnabled(false);
+        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setHintTextColor(0xBBFFFFFF);search.setTextSize(16);search.setSoundEffectsEnabled(false);
         search.setImeOptions(EditorInfo.IME_ACTION_GO);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         search.setPadding(dp(18),0,dp(18),0);Glass.control(search);cluster.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
         resultStrip=new HorizontalScrollView(context);resultStrip.setHorizontalScrollBarEnabled(false);resultStrip.setOverScrollMode(OVER_SCROLL_NEVER);
-        results=new LinearLayout(context);results.setOrientation(LinearLayout.HORIZONTAL);resultStrip.addView(results,new HorizontalScrollView.LayoutParams(-2,-2));cluster.addView(resultStrip,new LinearLayout.LayoutParams(-1,-2));body.addView(cluster);addView(body,new FrameLayout.LayoutParams(-1,-1));
+        results=new LinearLayout(context);results.setOrientation(LinearLayout.HORIZONTAL);resultStrip.addView(results,new HorizontalScrollView.LayoutParams(-2,-2));cluster.addView(resultStrip,new LinearLayout.LayoutParams(-1,-2));body.addView(cluster);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));addView(body,new FrameLayout.LayoutParams(-1,-1));
         resultStrip.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)sizeResults();});
         search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){resultStrip.scrollTo(0,0);refresh();}public void afterTextChanged(Editable e){}});
         search.setOnEditorActionListener((v,action,event)->{
@@ -55,24 +55,25 @@ final class AppDrawer extends FrameLayout {
                 if(search.getText().toString().isBlank())return true;List<AppCatalog.Entry> matches=catalog.search(search.getText().toString(),usage);if(!matches.isEmpty())actions.launch(matches.get(0));return true;
             }return false;
         });
-        search.setOnFocusChangeListener((v,focused)->{if(opened&&!closing){browsing=!focused;updatePresentation();}});
+        search.setOnFocusChangeListener((v,focused)->{if(opened&&!closing){browsing=!focused&&!searchOnly;updatePresentation();}});
         setOnApplyWindowInsetsListener((view,insets)->{applyInsets(insets);boolean shown=insets.isVisible(WindowInsets.Type.ime());
-            if(keyboard&&!shown&&opened&&!closing)browsing=true;keyboard=shown;if(shown&&!closing)browsing=false;updatePresentation();return insets;});
+            if(keyboard&&!shown&&opened&&!closing)browsing=!searchOnly;keyboard=shown;if(shown&&!closing)browsing=false;updatePresentation();return insets;});
         setWindowInsetsAnimationCallback(new WindowInsetsAnimation.Callback(WindowInsetsAnimation.Callback.DISPATCH_MODE_CONTINUE_ON_SUBTREE){
             @Override public WindowInsets onProgress(WindowInsets insets,List<WindowInsetsAnimation> running){applyInsets(insets);return insets;}
         });
         setVisibility(GONE);
     }
     private void applyInsets(WindowInsets insets){android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());int ime=insets.getInsets(WindowInsets.Type.ime()).bottom;setPadding(safe.left,safe.top,safe.right,Math.max(safe.bottom,ime));}
-    void open(boolean focus){boolean wasOpen=opened;opened=true;closing=false;browsing=false;setVisibility(VISIBLE);if(!wasOpen)refresh();else updatePresentation();if(focus)post(()->{if(opened&&!closing){search.requestFocus();getContext().getSystemService(InputMethodManager.class).showSoftInput(search,InputMethodManager.SHOW_IMPLICIT);}});}
+    void open(boolean focus){open(focus,false);}
+    void open(boolean focus,boolean fromSearch){boolean wasOpen=opened;if(!wasOpen)searchOnly=fromSearch;opened=true;closing=false;browsing=false;setVisibility(VISIBLE);if(!wasOpen)refresh();else updatePresentation();if(focus)post(()->{if(opened&&!closing){search.requestFocus();getContext().getSystemService(InputMethodManager.class).showSoftInput(search,InputMethodManager.SHOW_IMPLICIT);}});}
     void hideKeyboard(){closing=true;getContext().getSystemService(InputMethodManager.class).hideSoftInputFromWindow(getWindowToken(),0);}
     void reset(){opened=false;touching=false;contextActive=false;refreshPending=false;android.transition.TransitionManager.endTransitions(categories);hideKeyboard();search.clearFocus();search.setText("");expanded="";dismissing=false;browsing=false;scrolling.scrollTo(0,0);resultStrip.scrollTo(0,0);setClipBounds(null);setVisibility(GONE);}
     boolean isOpen(){return opened;}
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);if(opened)setReveal(reveal,dockBounds);}
     void setReveal(float amount,Rect origin){reveal=Math.max(0,Math.min(1,amount));dockBounds.set(origin);float remaining=1-reveal;revealBounds.set(Math.round(origin.left*remaining),Math.round(origin.top*remaining),Math.round(getWidth()+(origin.right-getWidth())*remaining),Math.round(getHeight()+(origin.bottom-getHeight())*remaining));setClipBounds(revealBounds);setOutlineProvider(revealOutline);invalidateOutline();header.setAlpha(reveal);scrolling.setAlpha(reveal);for(int i=0;i<results.getChildCount();i++)if(results.getChildAt(i)instanceof AppTile)((AppTile)results.getChildAt(i)).title.setAlpha(reveal);}
-    void updateGlass(){Glass.applySquare(this);setOutlineProvider(revealOutline);}
+    void updateGlass(){Glass.applySquare(this);setOutlineProvider(revealOutline);setClipToOutline(true);}
     private void sizeResults(){int cell=Math.max(dp(64),resultStrip.getWidth()/4);for(int i=0;i<results.getChildCount();i++){View child=results.getChildAt(i);android.view.ViewGroup.LayoutParams lp=child.getLayoutParams();lp.width=child instanceof AppTile?cell:Math.max(cell,resultStrip.getWidth());child.setLayoutParams(lp);}}
-    private void updatePresentation(){if(closing)return;scrolling.setVisibility(browsing?VISIBLE:INVISIBLE);if(browsing&&categories.getChildCount()==0)buildCategories();}
+    private void updatePresentation(){if(closing)return;resultStrip.setVisibility(browsing?GONE:VISIBLE);scrolling.setVisibility(browsing?VISIBLE:INVISIBLE);if(browsing&&categories.getChildCount()==0)buildCategories();}
     void refresh(){
         if(touching||contextActive){refreshPending=true;return;}refreshPending=false;
         results.removeAllViews();categories.removeAllViews();String query=search.getText().toString();Map<String,Integer> counts=NotificationRepository.counts();

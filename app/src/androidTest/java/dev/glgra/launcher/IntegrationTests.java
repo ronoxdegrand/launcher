@@ -65,7 +65,7 @@ public final class IntegrationTests extends Instrumentation {
             HomeActivity home = (HomeActivity) startActivitySync(new Intent(getTargetContext(), HomeActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
             awaitUi(() -> home.catalog.all().size() > 0 && home.canvas.getWidth() > 0, 15000, "Home/catalog did not become ready");
-            drawer(home); nativeDrags(home); notifications(home);
+            drawer(home); nativeDrags(home); notifications(home); transientMenus(home); demoExamples(home);
             result.putString("stream", "\n" + report + "All integrated tests passed.\n"); finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
             result.putString("stream", "\n" + report + android.util.Log.getStackTraceString(failure));
@@ -204,6 +204,8 @@ public final class IntegrationTests extends Instrumentation {
         catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
     private void drawer(HomeActivity home) {
+        main(()->home.canvas.setPosition(0));
+        if(Glass.blurAvailable(home))awaitUi(()->home.surfaceBlurs.visibleCount()==2,5000,"Native dock and notification blur regions did not appear");else main(()->check(home.surfaceBlurs.visibleCount()==0,"Blur-disabled mode leaves no regional blur windows visible"));
         saveDesignShot("modern-home");
         int[] dockCenters=new int[4];
         main(()->{LinearLayout dock=(LinearLayout)home.bottom.getChildAt(1);for(int i=0;i<4;i++){View tile=dock.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);dockCenters[i]=point[0]+tile.getWidth()/2;}});
@@ -216,12 +218,15 @@ public final class IntegrationTests extends Instrumentation {
             int top=-1;for(int i=0;i<4;i++){View tile=strip.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);check(Math.abs(point[0]+tile.getWidth()/2-dockCenters[i])<=2,"Search app retains its dock column");if(top<0)top=point[1];check(point[1]==top,"All default results share a horizontal row");check(tile instanceof AppTile&&((AppTile)tile).title.getAlpha()==1,"Search result names are revealed");}
             check(((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)!=0)==Glass.blurAvailable(home),"Backdrop blur follows Android support/state");});
         saveDesignShot("modern-search");
+        int[] searchTop=new int[1];main(()->{int[] point=new int[2];home.drawer.search.getLocationOnScreen(point);searchTop[0]=point[1];check(point[1]<home.stage.getHeight()/3,"Search is at the top, not attached to the IME");});
         main(() -> { home.drawer.search.setText(target.label); check(home.drawer.isOpen(), "Typing keeps drawer open");
             LinearLayout results = field(home.drawer, "results"); check(findText(results, target.label, false) != null, "Search shows matching installed app");
             home.drawer.search.setText(""); home.drawer.search.onEditorAction(EditorInfo.IME_ACTION_GO); check(home.drawer.isOpen(), "Enter with empty query does nothing");
             home.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(home.drawer.search.getWindowToken(), 0); home.drawer.search.clearFocus(); });
         awaitUi(() -> ((LinearLayout) field(home.drawer, "categories")).getVisibility() == View.VISIBLE, 5000, "Keyboard dismissal did not reveal categories");
         main(() -> {
+            check((Boolean)field(home.drawer,"browsing"),"Gesture entry reveals drawer after keyboard dismissal");
+            int[] point=new int[2];home.drawer.search.getLocationOnScreen(point);check(Math.abs(point[1]-searchTop[0])<=2,"Keyboard dismissal does not move the top search bar");
             LinearLayout categories = field(home.drawer, "categories"); check(categories.getChildCount() > 0, "Categorized app grid populated");
             TextView more = findText(categories, "+", true);
             if (more != null) { more.performClick(); check(!((String) field(home.drawer, "expanded")).isEmpty(), "Category expands inline"); }
@@ -229,7 +234,49 @@ public final class IntegrationTests extends Instrumentation {
             check((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)==0&&home.bottom.getAlpha()==1,"Closing restores clear Home and dock");
             check(home.drawer.search.getText().toString().isEmpty() && ((String) field(home.drawer, "expanded")).isEmpty(), "Closing resets query and category expansion");
         });
+        main(()->home.openDrawer(true,true));
+        awaitUi(()->home.drawer.search.hasFocus()&&home.drawer.getRootWindowInsets().isVisible(WindowInsets.Type.ime()),6000,"Search-button entry did not show keyboard");
+        main(()->{home.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(home.drawer.search.getWindowToken(),0);home.drawer.search.clearFocus();});
+        awaitUi(()->!home.drawer.getRootWindowInsets().isVisible(WindowInsets.Type.ime()),6000,"Search keyboard did not dismiss");
+        main(()->check(!(Boolean)field(home.drawer,"browsing")&&home.drawer.isOpen(),"Search-button entry stays in search when keyboard is dismissed"));
+        getTargetContext().startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setClass(getTargetContext(),HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitUi(()->!home.drawer.isOpen()&&!home.canvas.editing,5000,"Home intent did not leave search");
+        main(()->home.openDrawer(true));
+        awaitUi(()->home.drawer.search.hasFocus(),5000,"Gesture search did not open");
+        getTargetContext().startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setClass(getTargetContext(),HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitUi(()->!home.drawer.isOpen(),5000,"Home intent did not leave gesture search");
+        main(()->{int[] origin=new int[2];home.bottom.getLocationOnScreen(origin);check(origin[1]+home.bottom.getHeight()==home.stage.getHeight(),"Dock glass extends behind the navigation bar");
+            NotificationPanel panel=field(home,"notificationPanel");if(panel!=null){float[] corners=((android.graphics.drawable.GradientDrawable)panel.getBackground()).getCornerRadii();check(corners[0]==0&&corners[1]==0&&corners[6]==0&&corners[7]==0&&corners[2]>0,"Notification panel is square at the left boundary");}});
         passed("Drawer search/focus/IME, empty Enter, keyboard-dismissed categories and reset-on-close");
+    }
+    private void transientMenus(HomeActivity home){
+        main(()->{LinearLayout dock=(LinearLayout)home.bottom.getChildAt(1);check(dock.getChildAt(0).performLongClick(),"Dock opens context menu");});
+        awaitUi(()->{android.widget.PopupWindow popup=field(home,"contextPopup");return popup!=null&&popup.isShowing();},5000,"Context popup did not show");
+        getTargetContext().startActivity(new Intent(getTargetContext(),SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitUi(()->(Boolean)field(home,"wasStopped"),5000,"Home did not stop behind Settings");
+        main(()->{android.widget.PopupWindow popup=field(home,"contextPopup");check(!popup.isShowing()&&!(Boolean)field(home,"contextGesture")&&!home.canvas.manipulating,"Leaving Home clears popup and gesture state");check(home.surfaceBlurs.visibleCount()==0,"Home blur regions hide behind other activities");});
+        getTargetContext().startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setClass(getTargetContext(),HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitUi(()->home.hasWindowFocus()&&!(Boolean)field(home,"wasStopped"),5000,"Home did not resume");
+        passed("Context menus and regional blur windows are cleared on leaving Home");
+    }
+    private void demoExamples(HomeActivity home){
+        List<AppCatalog.Entry> examples=home.catalog.all().stream().filter(e->e.packageName.startsWith("dev.glgra.launcher.demo.")).toList();
+        if(examples.size()!=3)return;
+        diagnostic("Native category metadata: "+home.catalog.all().stream().filter(e->e.nativeCategory>=0).count()+" / "+home.catalog.all().size()+" installed apps");
+        for(AppCatalog.Entry entry:examples){check(entry.nativeCategory>=0&&!home.catalog.category(entry).equals("Uncategorized"),"Demo category is read from Android metadata");}
+        await(()->examples.stream().allMatch(e->NotificationRepository.counts().getOrDefault(e.packageName,0)>=7),10000,"Demo apps did not each post seven active notifications");
+        List<StatusBarNotification> records=NotificationRepository.snapshot().stream().filter(n->n.getPackageName().startsWith("dev.glgra.launcher.demo.")).toList();
+        check(records.stream().anyMatch(n->(n.getNotification().flags&Notification.FLAG_ONGOING_EVENT)!=0),"Ongoing fixture exists");
+        check(records.stream().anyMatch(n->Notification.CallStyle.class.getName().equals(n.getNotification().extras.getString(Notification.EXTRA_TEMPLATE))&&(n.getNotification().flags&Notification.FLAG_ONGOING_EVENT)!=0),"Native ongoing CallStyle non-dismissible example exists");
+        check(records.stream().anyMatch(n->n.getNotification().extras.getCharSequence(Notification.EXTRA_BIG_TEXT,"").length()>1000),"Long fixture exists");
+        check(records.stream().anyMatch(n->n.getNotification().extras.getCharSequence(Notification.EXTRA_TITLE,"").length()==0&&n.getNotification().extras.getCharSequence(Notification.EXTRA_TEXT,"").length()==0),"Content-free privacy fixture exists");
+        main(()->{home.closeDrawer();home.setEditing(false);home.canvas.setPosition(0);home.canvas.persistPosition();home.render();});
+        awaitUi(()->{NotificationPanel panel=field(home,"notificationPanel");return panel!=null&&findText(panel,"Demo · Messages",true)!=null;},5000,"Demo groups are missing from the panel");
+        saveDesignShot("notification-examples-collapsed");
+        main(()->{NotificationPanel panel=field(home,"notificationPanel");TextView title=findText(panel,"Demo · Messages",true);((View)title.getParent()).performClick();check(findText(panel,"Content hidden",false)!=null,"Privacy preview remains generic");TextView longText=findText(panel,"This deliberately long example",true);check(longText!=null,"Long notification preview available");longText.performClick();});
+        saveDesignShot("notification-examples-expanded");
+        main(()->{NotificationPanel panel=field(home,"notificationPanel");panel.reset();});
+        passed("Three real demo app groups, native categories, long/hidden/ongoing/image/progress examples ready for exploration");
     }
     private TextView findText(View view, String text, boolean prefix) {
         if (view instanceof TextView) { String value = ((TextView) view).getText().toString(); if (prefix ? value.startsWith(text) : value.equals(text)) return (TextView) view; }
@@ -364,7 +411,7 @@ public final class IntegrationTests extends Instrumentation {
         Bundle update = new Bundle(); update.putString("stream", "DIAG " + message + "\n"); sendStatus(0, update);
     }
     private void saveDesignShot(String name) {
-        waitForIdleSync();android.graphics.Bitmap screenshot=getUiAutomation().takeScreenshot();
+        waitForIdleSync();SystemClock.sleep(120);android.graphics.Bitmap screenshot=getUiAutomation().takeScreenshot();
         check(screenshot!=null,"Design screenshot available");
         try{java.io.File directory=getTargetContext().getExternalFilesDir("design");check(directory!=null&&(directory.isDirectory()||directory.mkdirs()),"Design evidence directory");
             try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(directory,name+".png"))){check(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out),"Design screenshot saved");}

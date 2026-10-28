@@ -1,13 +1,9 @@
-Modern glass surfaces, refined controls and badges, with system backdrop blur in the app drawer where supported.
+v0.2.3
 
-The dock expands into horizontal search results: the same four icon columns, fading app names, and a result strip that follows the keyboard. Additional matches scroll sideways. Touch-held tiles remain stable when app data refreshes.
+Search opens at the top for every entry point. Dismissing the keyboard after a Home swipe or dock drag reveals the app drawer. After the Home Search button, it stays in search. Home closes all launcher overlays.
 
-Widget-first native home canvas with continuous column scrolling, local layout persistence, widget resizing and app/folder drag editing.
+Real regional compositor blur replaces white palette fills on the dock and notification panel. The drawer keeps true system backdrop blur with neutral tint. Dock glass reaches behind the navigation bar; the notification panel's left edge is square. Android-disabled blur has a neutral readable fallback.
 
-Adaptive four-app dock, local fuzzy app search, native app categories, manual pins, hidden apps and category overrides.
+Context menus are dismissed on leaving Home so detached menus cannot block later gestures.
 
-Read-only grouped notification previews with local text/media expansion and active-notification badges.
-
-Local usage summaries, system-aware haptics and themes, cached wallpaper-color surfaces, pinned app shortcuts and safe signed APK updates.
-
-Samsung app-pair delivery and assistant query forwarding remain conditional on verified device capabilities. Android wallpaper-pixel restrictions use a palette-based glass fallback.
+Optional local notification companion apps provide grouped, long, hidden-content, image, ongoing, finite progress and temporary non-dismissible CallStyle examples. Companions are separate emulator tools, not part of the launcher APK. Progress on Android 14 is not a system-promoted Live Update.

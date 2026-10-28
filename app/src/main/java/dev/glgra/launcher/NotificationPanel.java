@@ -292,7 +292,7 @@ public final class NotificationPanel extends ScrollView {
     }
     private TextView text(String value, int size) {
         TextView text = new TextView(getContext()); text.setText(value); text.setTextSize(size);
-        text.setTextColor(dark() ? Color.WHITE : 0xFF172522); text.setSoundEffectsEnabled(false); return text;
+        text.setTextColor(Glass.ink(getContext()));text.setShadowLayer(dp(2),0,dp(1),0xAA000000); text.setSoundEffectsEnabled(false); return text;
     }
     private boolean dark() { return (getResources().getConfiguration().uiMode & 0x30) == 0x20; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

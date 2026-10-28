@@ -26,7 +26,7 @@ final class AppTile extends LinearLayout {
             FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(Glass.dp(context,count>99?29:24),Glass.dp(context,24),Gravity.TOP|Gravity.RIGHT);image.addView(badge,bp);
         }
         title=new TextView(context);title.setText(entry.label);title.setTextSize(12);title.setTextColor(Glass.ink(context));
-        title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setIncludeFontPadding(false);
+        title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setIncludeFontPadding(false);title.setShadowLayer(Glass.dp(context,2),0,Glass.dp(context,1),0xAA000000);
         LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,-2);tp.topMargin=Glass.dp(context,4);addView(title,tp);
         title.setAlpha(named?1:0);setClipChildren(false);
     }
