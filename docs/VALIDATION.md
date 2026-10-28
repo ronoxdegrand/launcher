@@ -1,10 +1,10 @@
-# Validation · 2026-10-26
+# Validation · 2026-10-29
 
 ## Current preview
 
-Package `dev.glgra.launcher`, version 0.2.2 (code 2002); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 181,009 bytes (approximately 177 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
+Package `dev.glgra.launcher`, version 0.2.3 (code 2003); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 184,205 bytes (approximately 180 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
 
-`assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 22 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
+`assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 24 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
 
 ## Emulator runtime proof
 
@@ -64,3 +64,5 @@ Build/lint pass with zero errors and 24 warnings. Integrated checks pass with bl
 Three separate companion app packages post real local examples. Each has a summary and eight children while the temporary call-style service is active; the launcher displays 8 after summary deduplication. Native records verify CallStyle + ONGOING + NO_CLEAR + FOREGROUND_SERVICE flags. The shortService self-stops after 120 seconds, and the demo app can restart or stop it. Other examples cover grouped short messages, 10 paragraphs, deliberately absent content, ordinary ongoing, a generated image and bounded changing progress. The examples use no real call, audio, network or personal data. API 34 progress is not a genuine system-promoted Live Update.
 
 Category discovery also passes: our three companions expose Social/Productivity/Maps through native metadata; only 3 of 15 installed emulator apps provide a native category. See CATEGORIES-AND-DEMOS.md for sources and platform limits. Images and raw results are saved in artifacts; companion APKs are built separately and never included in the launcher release.
+
+The [v0.2.3 workflow](https://github.com/ronoxdegrand/launcher/actions/runs/40758177156) completed successfully. The published APK is 184,205 bytes, SHA-256 `e253a972b07e77869295db27a09c348e30647223f4724ccaeabb5443a216041f`; independent checksum and pinned-certificate verification pass. It is installed as a compatible update in the visible emulator, with the three companion apps reposted. Final review also fixed and tested stale context-menu cleanup on stop/destroy. Navigation-bar contrast enforcement is disabled after decor creation and in the theme, allowing the dock surface to continue behind the controls.
