@@ -1,0 +1,2 @@
+Blur supported on device: true
+Blur enabled: false

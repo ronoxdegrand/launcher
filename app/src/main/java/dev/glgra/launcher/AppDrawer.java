@@ -25,6 +25,7 @@ final class AppDrawer extends FrameLayout {
     private final LinearLayout results, categories;
     private final ScrollView scrolling;
     private final HorizontalScrollView resultStrip;
+    private final View resultSpace;
     private final LinearLayout header,cluster;
     private int gridRow;
     private boolean keyboard, opened, browsing, touching, refreshPending, closing, searchOnly;
@@ -37,18 +38,18 @@ final class AppDrawer extends FrameLayout {
     AppDrawer(Context context, AppCatalog catalog, UsageRepository usage, Actions actions) {
         super(context);this.catalog=catalog;this.usage=usage;this.actions=actions;
         touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();Glass.applySquare(this);setSoundEffectsEnabled(false);
-        LinearLayout body=new LinearLayout(context);body.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout body=new LinearLayout(context);body.setOrientation(LinearLayout.VERTICAL);body.setClipChildren(false);setClipChildren(false);setClipToPadding(false);
         header=new LinearLayout(context);header.setGravity(Gravity.CENTER);
         View handle=new View(context);android.graphics.drawable.GradientDrawable pill=new android.graphics.drawable.GradientDrawable();pill.setColor(0x66FFFFFF);pill.setCornerRadius(dp(3));handle.setBackground(pill);
         header.addView(handle,new LinearLayout.LayoutParams(dp(34),dp(4)));header.setContentDescription("Close apps");header.setOnClickListener(v->actions.close());body.addView(header,new LinearLayout.LayoutParams(-1,0));header.setVisibility(GONE);
         scrolling=new ScrollView(context);scrolling.setVerticalScrollBarEnabled(false);scrolling.setClipToPadding(false);scrolling.setPadding(0,0,0,0);
         categories=new LinearLayout(context);categories.setOrientation(LinearLayout.VERTICAL);scrolling.addView(categories);
-        cluster=new LinearLayout(context);cluster.setOrientation(LinearLayout.VERTICAL);Glass.area(cluster);
-        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setHintTextColor(0xBBFFFFFF);search.setTextSize(16);search.setSoundEffectsEnabled(false);
+        cluster=new LinearLayout(context);cluster.setOrientation(LinearLayout.VERTICAL);cluster.setClipChildren(false);Glass.area(cluster);
+        search=new EditText(context);search.setSingleLine(true);search.setHint("Search apps");search.setTextColor(Glass.ink(context));search.setHintTextColor(0xBBFFFFFF);Design.type(search,22,28,500);search.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search,0,0,0);search.setCompoundDrawablePadding(dp(12));search.setSoundEffectsEnabled(false);
         search.setImeOptions(EditorInfo.IME_ACTION_GO);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        search.setPadding(dp(18),0,dp(18),0);search.setBackgroundColor(android.graphics.Color.TRANSPARENT);cluster.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
+        search.setPadding(dp(24),0,dp(24),0);search.setBackground(new android.graphics.drawable.InsetDrawable(Glass.shape(context,Glass.ROUNDED,0xA310151D),dp(8)));search.setPadding(dp(24),0,dp(24),0);cluster.addView(search,new LinearLayout.LayoutParams(-1,dp(44)));
         resultStrip=new HorizontalScrollView(context);resultStrip.setHorizontalScrollBarEnabled(false);resultStrip.setOverScrollMode(OVER_SCROLL_NEVER);
-        results=new LinearLayout(context);results.setOrientation(LinearLayout.HORIZONTAL);resultStrip.addView(results,new HorizontalScrollView.LayoutParams(-2,-1));cluster.addView(resultStrip,new LinearLayout.LayoutParams(-1,dp(100)));body.addView(cluster);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));addView(body,new FrameLayout.LayoutParams(-1,-1));
+        results=new LinearLayout(context);results.setOrientation(LinearLayout.HORIZONTAL);resultStrip.addView(results,new HorizontalScrollView.LayoutParams(-2,-1));resultSpace=new View(context);cluster.addView(resultSpace,new LinearLayout.LayoutParams(-1,dp(100)));body.addView(cluster);body.addView(scrolling,new LinearLayout.LayoutParams(-1,0,1));addView(body,new FrameLayout.LayoutParams(-1,-1));FrameLayout.LayoutParams lane=new FrameLayout.LayoutParams(-1,dp(100));lane.topMargin=dp(100);addView(resultStrip,lane);
         resultStrip.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)sizeResults();});
         search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){resultStrip.scrollTo(0,0);refresh();}public void afterTextChanged(Editable e){}});
         search.setOnEditorActionListener((v,action,event)->{
@@ -71,12 +72,13 @@ final class AppDrawer extends FrameLayout {
     void reset(){opened=false;touching=false;contextActive=false;refreshPending=false;android.transition.TransitionManager.endTransitions(categories);hideKeyboard();search.clearFocus();search.setText("");expanded="";dismissing=false;browsing=false;scrolling.scrollTo(0,0);resultStrip.scrollTo(0,0);setClipBounds(null);setVisibility(GONE);}
     boolean isOpen(){return opened;}
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);if(opened)setReveal(reveal,dockBounds);}
-    void setReveal(float amount,Rect origin){reveal=Math.max(0,Math.min(1,amount));dockBounds.set(origin);float remaining=1-reveal;revealBounds.set(Math.round(origin.left*remaining),Math.round(origin.top*remaining),Math.round(getWidth()+(origin.right-getWidth())*remaining),Math.round(getHeight()+(origin.bottom-getHeight())*remaining));setClipBounds(revealBounds);setOutlineProvider(revealOutline);invalidateOutline();header.setAlpha(reveal);scrolling.setAlpha(reveal);for(int i=0;i<results.getChildCount();i++)if(results.getChildAt(i)instanceof AppTile)((AppTile)results.getChildAt(i)).title.setAlpha(reveal);}
+    void setReveal(float amount,Rect origin){reveal=Math.max(0,Math.min(1,amount));dockBounds.set(origin);float remaining=1-reveal;revealBounds.set(Math.round(origin.left*remaining),Math.round(origin.top*remaining),Math.round(getWidth()+(origin.right-getWidth())*remaining),Math.round(getHeight()+(origin.bottom-getHeight())*remaining));setClipBounds(revealBounds);setOutlineProvider(revealOutline);invalidateOutline();header.setAlpha(reveal);float effects=Math.max(0,Math.min(1,(reveal-.2f)/.8f));scrolling.setAlpha(effects);search.setAlpha(effects);int[] strip=new int[2],parent=new int[2];resultStrip.getLocationOnScreen(strip);getLocationOnScreen(parent);float restingTop=strip[1]-parent[1]-resultStrip.getTranslationY();resultStrip.setTranslationY((origin.top+dp(52)-restingTop)*remaining);for(int i=0;i<results.getChildCount();i++)if(results.getChildAt(i)instanceof AppTile)((AppTile)results.getChildAt(i)).title.setAlpha(reveal);}
+    @Override protected void onLayout(boolean changed,int l,int t,int r,int b){super.onLayout(changed,l,t,r,b);if(opened)setReveal(reveal,dockBounds);}
     void updateGlass(){Glass.applySquare(this);setOutlineProvider(revealOutline);setClipToOutline(true);}
-    void setGridRow(int row){if(gridRow==row)return;gridRow=row;search.getLayoutParams().height=row;resultStrip.getLayoutParams().height=row;search.requestLayout();resultStrip.requestLayout();sizeResults();if(browsing){categories.removeAllViews();buildCategories();}}
+    void setGridRow(int row){if(gridRow==row)return;gridRow=row;search.getLayoutParams().height=row;resultStrip.getLayoutParams().height=row;((FrameLayout.LayoutParams)resultStrip.getLayoutParams()).topMargin=row;resultSpace.getLayoutParams().height=row;resultSpace.requestLayout();search.requestLayout();resultStrip.requestLayout();sizeResults();if(browsing){categories.removeAllViews();buildCategories();}}
     private int rowHeight(){return gridRow>0?gridRow:dp(100);}
     private void sizeResults(){int cell=Math.max(dp(64),resultStrip.getWidth()/4);for(int i=0;i<results.getChildCount();i++){View child=results.getChildAt(i);android.view.ViewGroup.LayoutParams lp=child.getLayoutParams();lp.width=child instanceof AppTile?cell:Math.max(cell,resultStrip.getWidth());lp.height=rowHeight();child.setLayoutParams(lp);}}
-    private void updatePresentation(){if(closing)return;resultStrip.setVisibility(browsing?GONE:VISIBLE);scrolling.setVisibility(browsing?VISIBLE:INVISIBLE);if(browsing&&categories.getChildCount()==0)buildCategories();}
+    private void updatePresentation(){if(closing)return;resultStrip.setVisibility(browsing?GONE:VISIBLE);resultSpace.setVisibility(browsing?GONE:VISIBLE);scrolling.setVisibility(browsing?VISIBLE:INVISIBLE);if(browsing&&categories.getChildCount()==0)buildCategories();}
     void refresh(){
         if(touching||contextActive){refreshPending=true;return;}refreshPending=false;
         results.removeAllViews();categories.removeAllViews();String query=search.getText().toString();Map<String,Integer> counts=NotificationRepository.counts();
@@ -100,13 +102,13 @@ final class AppDrawer extends FrameLayout {
                 finishPair(pair);
                 pair=null;FrameLayout block=new FrameLayout(getContext());Glass.area(block);
                 block.setTransitionName("category-group:"+name);
-                TextView heading=label(name+"   −",17);heading.setTransitionName("category-heading:"+name);heading.setOnClickListener(v->expand(""));
-                GridLayout grid=grid(4);grid.setTransitionName("category-grid:"+name);for(AppCatalog.Entry entry:entries)addCell(grid,appCell(entry),4);block.addView(grid,new FrameLayout.LayoutParams(-1,-1));heading.setTextSize(11);heading.setGravity(Gravity.CENTER);block.addView(heading,new FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP));categories.addView(block,new LinearLayout.LayoutParams(-1,((entries.size()+3)/4)*rowHeight()));continue;
+                TextView heading=label(name,12);heading.setTransitionName("category-heading:"+name);heading.setContentDescription(name);
+                GridLayout grid=grid(4);grid.setTransitionName("category-grid:"+name);for(AppCatalog.Entry entry:entries)addCell(grid,appCell(entry),4);TextView collapse=Design.more(getContext(),"−");collapse.setContentDescription("Collapse "+name);collapse.setOnClickListener(v->expand(""));addCell(grid,collapse,4);block.addView(grid,new FrameLayout.LayoutParams(-1,-1));Design.caption(heading);heading.setPadding(dp(16),0,dp(12),0);heading.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);block.addView(heading,new FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP));categories.addView(block,new LinearLayout.LayoutParams(-1,((entries.size()+4)/4)*rowHeight()));continue;
             }
             if(pair==null){pair=new LinearLayout(getContext());categories.addView(pair,new LinearLayout.LayoutParams(-1,-2));}
-            FrameLayout tile=new FrameLayout(getContext());tile.setTransitionName("category-group:"+name);Glass.area(tile);TextView title=label(name,11);title.setTransitionName("category-heading:"+name);title.setGravity(Gravity.CENTER);
+            FrameLayout tile=new FrameLayout(getContext());tile.setTransitionName("category-group:"+name);Glass.area(tile);TextView title=label(name,12);Design.caption(title);title.setPadding(dp(16),0,dp(12),0);title.setTransitionName("category-heading:"+name);title.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);
             GridLayout grid=grid(2);grid.setTransitionName("category-grid:"+name);for(int i=0;i<Math.min(3,entries.size());i++)addCell(grid,appCell(entries.get(i)),2);
-            if(entries.size()>=4){TextView more=label("+"+(entries.size()-3),22);more.setGravity(Gravity.CENTER);more.setOnClickListener(v->expand(name));addCell(grid,more,2);}
+            if(entries.size()>=4){TextView more=Design.more(getContext(),"+"+(entries.size()-3));more.setOnClickListener(v->expand(name));addCell(grid,more,2);}
             while(grid.getChildCount()<4){View spacer=new View(getContext());spacer.setVisibility(INVISIBLE);addCell(grid,spacer,2);}
             tile.addView(grid,new FrameLayout.LayoutParams(-1,-1));tile.addView(title,new FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP));pair.addView(tile,new LinearLayout.LayoutParams(0,2*rowHeight(),1));if(pair.getChildCount()==2)pair=null;
         }
@@ -117,7 +119,7 @@ final class AppDrawer extends FrameLayout {
         if(ValueAnimator.areAnimatorsEnabled()){
             android.transition.ChangeBounds bounds=new android.transition.ChangeBounds();bounds.setReparent(true);
             android.transition.TransitionSet transition=new android.transition.TransitionSet().setOrdering(android.transition.TransitionSet.ORDERING_TOGETHER);
-            transition.addTransition(bounds).addTransition(new android.transition.Fade());transition.setDuration(200);
+            transition.addTransition(bounds).addTransition(new android.transition.Fade());transition.setDuration(260);transition.setInterpolator(Motion.EFFECTS);
             transition.setMatchOrder(android.transition.Transition.MATCH_NAME,android.transition.Transition.MATCH_INSTANCE);
             android.transition.TransitionManager.beginDelayedTransition(categories,transition);
         }else android.transition.TransitionManager.endTransitions(categories);

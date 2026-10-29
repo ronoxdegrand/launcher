@@ -215,7 +215,7 @@ public final class IntegrationTests extends Instrumentation {
         awaitUi(() -> home.drawer.isOpen() && home.drawer.search.hasFocus(), 5000, "Drawer search did not receive focus");
         awaitUi(() -> home.drawer.getRootWindowInsets() != null && home.drawer.getRootWindowInsets().isVisible(WindowInsets.Type.ime()), 6000, "Soft keyboard did not open");
         AppCatalog.Entry target = home.catalog.all().get(0);
-        awaitUi(()->(Float)field(home,"drawerReveal")>=.999f,5000,"Dock expansion animation did not finish");
+        awaitUi(()->(Float)field(home,"drawerReveal")==1f,5000,"Dock expansion animation did not finish");
         main(()->{LinearLayout strip=field(home.drawer,"results");check(strip.getOrientation()==LinearLayout.HORIZONTAL&&strip.getChildCount()==4,"Empty search preserves a horizontal four-app dock");
             int top=-1;for(int i=0;i<4;i++){View tile=strip.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);check(Math.abs(point[0]+tile.getWidth()/2-dockCenters[i])<=2,"Search app retains its dock column");if(top<0)top=point[1];check(point[1]==top,"All default results share a horizontal row");check(tile instanceof AppTile&&((AppTile)tile).title.getAlpha()==1,"Search result names are revealed");}
             check(((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)!=0)==Glass.blurAvailable(home),"Backdrop blur follows Android support/state");});
@@ -256,7 +256,7 @@ public final class IntegrationTests extends Instrumentation {
         if(Glass.blurAvailable(home)){
             for(int repeat=0;repeat<3;repeat++){
                 main(()->home.openDrawer(false));
-                awaitUi(()->(Float)field(home,"drawerReveal")>=.999f,5000,"Drawer transition did not settle");
+                awaitUi(()->(Float)field(home,"drawerReveal")==1f,5000,"Drawer transition did not settle");
                 main(home::closeDrawer);
                 awaitUi(()->blurBoundsMatch(home),5000,"Dock blur bounds did not recover after drawer transition");
             }

@@ -24,7 +24,7 @@ No analytics, accounts or cloud sync. Usage summaries stay local. Notifications 
 
 This is a development preview. No Galaxy S23 was connected during implementation. Assistant query forwarding is omitted pending proof that the selected assistant accepts text. Samsung pairs require One UI to deliver a standard pinned shortcut. One UI privileged navigation animation parity is outside the public API contract. The drawer and regional Home surfaces use public compositor blur when Android enables it, with a neutral opaque fallback otherwise. The dock extends behind navigation controls; the notification panel is square at the left boundary. No wallpaper pixel access or overlay permission is requested. Badges count active notification records, not messages within a record.
 
-See [integration findings](docs/INTEGRATIONS.md), [validation](docs/VALIDATION.md), and [device acceptance checks](docs/DEVICE-CHECKS.md).
+See [design research and decisions](docs/DESIGN.md), [integration findings](docs/INTEGRATIONS.md), [validation](docs/VALIDATION.md), and [device acceptance checks](docs/DEVICE-CHECKS.md).
 
 ## Build and test
 

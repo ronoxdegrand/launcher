@@ -209,18 +209,26 @@ public final class NotificationPanel extends ScrollView {
     }
     private void refreshPreview() {
         if (isInTouchMode()) requestFocus();
+        Set<String> previousRows=new HashSet<>(rows.keySet());
         refreshPending = false; main.removeCallbacks(refreshWhenQuiet); rebuild();
+        if(android.animation.ValueAnimator.areAnimatorsEnabled())for(Map.Entry<String,View> entry:rows.entrySet())if(!previousRows.contains(entry.getKey())){
+            View row=entry.getValue();row.setAlpha(0);row.animate().alpha(1).setDuration(160).setInterpolator(Motion.EFFECTS).start();
+        }
     }
     private void addGroup(String packageName, List<StatusBarNotification> records) {
         LinearLayout section = new LinearLayout(getContext()); section.setOrientation(LinearLayout.VERTICAL);
         LinearLayout header = new LinearLayout(getContext()); header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(0, dp(9), 0, dp(9)); header.setSoundEffectsEnabled(false);
+        header.setPadding(0, dp(12), 0, dp(12));header.setMinimumHeight(dp(64)); header.setSoundEffectsEnabled(false);
         ImageView icon = new ImageView(getContext()); icon.setImageDrawable(appIcon(packageName));
         header.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView name = text(appName(packageName) + "  " + records.size(), 16);
-        name.setPadding(dp(10), 0, dp(6), 0); name.setMaxLines(2);
+        String groupLabel=appName(packageName)+"  "+records.size();
+        android.text.SpannableString groupText=new android.text.SpannableString(groupLabel);
+        groupText.setSpan(new android.text.style.RelativeSizeSpan(.75f),appName(packageName).length(),groupLabel.length(),0);
+        groupText.setSpan(new android.text.style.ForegroundColorSpan(0xBFF2F4F8),appName(packageName).length(),groupLabel.length(),0);
+        TextView name = text(groupLabel, 16);name.setText(groupText);
+        Design.type(name,16,24,600);name.setPadding(dp(12), 0, dp(8), 0); name.setMaxLines(2);
         header.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView time = text(relative(records.get(0).getPostTime()), 12); time.setAlpha(.65f); header.addView(time);
+        TextView time = text(relative(records.get(0).getPostTime()), 12); time.setAlpha(.76f); header.addView(time);
         header.setContentDescription(appName(packageName) + ", " + records.size() + " active notifications, " + (groups.contains(packageName) ? "expanded" : "collapsed"));
         header.setOnClickListener(v -> {
             if (!groups.add(packageName)) groups.remove(packageName);
@@ -229,7 +237,7 @@ public final class NotificationPanel extends ScrollView {
         rows.put("group:" + packageName, header);
         section.addView(header);
         if (groups.contains(packageName)) for (StatusBarNotification record : records) addMessage(section, record);
-        LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(-1, -2); sectionParams.bottomMargin = dp(8);
+        LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(-1, -2); sectionParams.bottomMargin = dp(16);
         body.addView(section, sectionParams);
     }
     private void addMessage(LinearLayout section, StatusBarNotification record) {
@@ -249,13 +257,13 @@ public final class NotificationPanel extends ScrollView {
         if (hidden) full = "Content hidden";
         String key = record.getKey();
         LinearLayout row = new LinearLayout(getContext()); row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(dp(8), dp(7), dp(4), dp(10));
-        if (!title.isEmpty()) { TextView heading = text(title, 14); heading.setTypeface(null, android.graphics.Typeface.BOLD); row.addView(heading); }
+        row.setPadding(dp(4), dp(12), dp(4), dp(16));
+        if (!title.isEmpty()) { TextView heading = text(title, 14); Design.type(heading,14,20,600);heading.setPadding(0,0,0,dp(4)); row.addView(heading); }
         TextView content = text(full.isEmpty() ? "Content hidden" : full, 14);
-        content.setMaxLines(messages.contains(key) ? Integer.MAX_VALUE : 3); content.setEllipsize(TextUtils.TruncateAt.END);
+        content.setMinHeight(dp(48));content.setMaxLines(messages.contains(key) ? Integer.MAX_VALUE : 3); content.setEllipsize(TextUtils.TruncateAt.END);
         content.setOnClickListener(v -> { if (!messages.add(key)) messages.remove(key); refreshPreview(); });
         row.addView(content);
-        TextView timestamp = text(relative(record.getPostTime()), 11); timestamp.setAlpha(.6f); timestamp.setPadding(0, dp(4), 0, 0); row.addView(timestamp);
+        TextView timestamp = text(relative(record.getPostTime()), 12); timestamp.setAlpha(.76f); timestamp.setPadding(0, dp(4), 0, 0); row.addView(timestamp);
         if (!hidden) addMedia(row, record);
         section.addView(row);
         rows.put("notification:" + key, row);
@@ -378,7 +386,7 @@ public final class NotificationPanel extends ScrollView {
     }
     private TextView text(String value, int size) {
         TextView text = new TextView(getContext()); text.setText(value); text.setTextSize(size);
-        text.setTextColor(Glass.ink(getContext()));text.setShadowLayer(dp(1),0,0,0x40000000); text.setSoundEffectsEnabled(false); return text;
+        Design.type(text,size,size<=12?16:size<=14?22:24,400);text.setTextColor(Glass.ink(getContext()));text.setShadowLayer(.7f*getResources().getDisplayMetrics().density,0,0,0x80000000); text.setSoundEffectsEnabled(false); return text;
     }
     private boolean dark() { return (getResources().getConfiguration().uiMode & 0x30) == 0x20; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

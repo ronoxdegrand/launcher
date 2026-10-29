@@ -1,0 +1,1 @@
+PASS group/text expansion preserves viewport; timed small bidirectional drags scroll normally; listener update during touch preserves gesture; native notifications remain active.

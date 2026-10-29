@@ -28,7 +28,7 @@ public final class HomeActivity extends Activity {
     SurfaceBlur surfaceBlurs;
     private GridModel.Item resizeSelection;
     private long lastMetadataLoad;
-    private android.animation.ValueAnimator drawerMotion;
+    private Motion.Spring drawerMotion;
     private float drawerReveal;
     private boolean touchingDock,dockRefreshPending;
     private final java.util.function.Consumer<Boolean> blurChanged=enabled->{if(drawer!=null){drawer.updateGlass();Glass.backdrop(getWindow(),canvas,drawer.isOpen());Glass.applyDock(bottom);if(notificationPanel!=null)Glass.applyNotifications(notificationPanel);if(surfaceBlurs!=null)surfaceBlurs.sync();}};
@@ -39,7 +39,7 @@ public final class HomeActivity extends Activity {
         public void onPackagesUnavailable(String[] p,UserHandle u,boolean r){refreshApps(true);}
     };
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);getWindow().setDecorFitsSystemWindows(false);getWindow().setNavigationBarContrastEnforced(false);getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        super.onCreate(saved);getWindow().setDecorFitsSystemWindows(false);getWindow().setStatusBarContrastEnforced(true);getWindow().setNavigationBarContrastEnforced(false);getWindow().setNavigationBarColor(Color.TRANSPARENT);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         store=new LayoutStore(this);model=store.load();catalog=new AppCatalog(this);usage=new UsageRepository(this);
         model.reserveNotifications(store.prefs.getBoolean("notificationsEnabled",true),store.prefs.getInt("notificationWidth",3));store.save(model);
@@ -48,7 +48,7 @@ public final class HomeActivity extends Activity {
         Set<Integer> ids=new HashSet<>();for(GridModel.Item i:model.items)if(i.isWidget())ids.add(i.widgetId);
         for(int id:host.getAppWidgetIds())if(!ids.contains(id)&&id!=pendingId)host.deleteAppWidgetId(id);
         stage=new FrameLayout(this);root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
-        root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());root.setPadding(bars.left,bars.top,bars.right,0);bottom.setPadding(0,0,0,bars.bottom);return insets;});
+        root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());root.setPadding(bars.left,canvas!=null&&canvas.editing?0:bars.top,bars.right,canvas!=null&&canvas.editing?bars.bottom:0);bottom.setPadding(0,0,0,bars.bottom);return insets;});
         canvas=new HomeCanvas(this,model,store);canvas.onEdit=this::enterEditing;canvas.onSwipeUp=()->openDrawer(true);
         root.addView(canvas,new LinearLayout.LayoutParams(-1,0,1));
         bottom=new DockSurface();bottom.setOrientation(LinearLayout.VERTICAL);Glass.applyDock(bottom);LinearLayout.LayoutParams dockParams=new LinearLayout.LayoutParams(-1,-2);dockParams.setMargins(0,0,0,0);root.addView(bottom,dockParams);
@@ -128,7 +128,7 @@ public final class HomeActivity extends Activity {
             }});return frame;
     }
     private View shortcutView(GridModel.Item item,boolean badge){
-        LinearLayout view=new LinearLayout(this);view.setOrientation(LinearLayout.VERTICAL);view.setGravity(Gravity.CENTER);view.setPadding(dp(4),dp(4),dp(4),dp(4));
+        LinearLayout view=new LinearLayout(this);view.setOrientation(LinearLayout.VERTICAL);view.setGravity(Gravity.CENTER);view.setPadding(dp(4),dp(16),dp(4),0);
         ImageView icon=new ImageView(this);String label=item.name;
         try{ComponentName c=ComponentName.unflattenFromString(item.component);
             if(item.kind.equals("shortcut")){
@@ -136,27 +136,35 @@ public final class HomeActivity extends Activity {
                 if(list!=null&&!list.isEmpty())icon.setImageDrawable(getSystemService(LauncherApps.class).getShortcutIconDrawable(list.get(0),0));else icon.setImageDrawable(getPackageManager().getActivityIcon(c));
             }else{AppCatalog.Entry entry=catalog.find(item.component);icon.setImageDrawable(entry==null?getPackageManager().getActivityIcon(c):entry.icon);if(label.isBlank())label=entry==null?getPackageManager().getActivityInfo(c,0).loadLabel(getPackageManager()).toString():entry.label;}
         }catch(Exception unavailable){label=label.isBlank()?"App unavailable":label;icon.setImageResource(android.R.drawable.sym_def_app_icon);}
-        FrameLayout image=new FrameLayout(this);image.addView(icon,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.CENTER));view.addView(image,new LinearLayout.LayoutParams(dp(60),dp(56)));TextView name=text(label);name.setTextSize(12);name.setMaxLines(2);name.setIncludeFontPadding(false);LinearLayout.LayoutParams labelParams=new LinearLayout.LayoutParams(-1,-2);labelParams.topMargin=dp(4);view.addView(name,labelParams);
-        view.setSoundEffectsEnabled(false);view.setOnClickListener(v->launchItem(item));return view;
+        FrameLayout image=new FrameLayout(this);image.addView(icon,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.CENTER));view.addView(image,new LinearLayout.LayoutParams(dp(60),dp(52)));TextView name=text(label);Design.label(name);name.setLines(getResources().getConfiguration().fontScale>1.15f?1:2);name.setIncludeFontPadding(false);LinearLayout.LayoutParams labelParams=new LinearLayout.LayoutParams(-1,-2);labelParams.topMargin=dp(4);view.addView(name,labelParams);
+        Design.press(view);view.setSoundEffectsEnabled(false);view.setOnClickListener(v->launchItem(item));return view;
     }
     private View folderView(GridModel.Item folder){
         FrameLayout card=new FrameLayout(this);Glass.area(card);
         GridLayout grid=new GridLayout(this);grid.setColumnCount(2);List<GridModel.Item> children=rankedChildren(folder);
         for(int i=0;i<Math.min(3,children.size());i++){GridModel.Item child=children.get(i);View icon=shortcutView(child,false);enableDragTouch(icon,new DragPayload(child,null));icon.setOnLongClickListener(v->{appMenu(v,catalog.find(child.component),child);return true;});folderCell(grid,icon);}
-        TextView more=text("+"+Math.max(0,children.size()-3));more.setTextSize(24);more.setOnClickListener(v->openFolder(folder,card));folderCell(grid,more);card.addView(grid,new FrameLayout.LayoutParams(-1,-1));
+        while(grid.getChildCount()<3)folderCell(grid,new View(this));TextView more=Design.more(this,"+"+Math.max(0,children.size()-3));more.setOnClickListener(v->openFolder(folder,card));folderCell(grid,more);card.addView(grid,new FrameLayout.LayoutParams(-1,-1));
         int count=0;for(GridModel.Item child:children){ComponentName c=ComponentName.unflattenFromString(child.component);if(c!=null)count+=NotificationRepository.counts().getOrDefault(c.getPackageName(),0);}
-        TextView name=text(folder.name+(count>0?"  · "+count:""));name.setTag("folder-badge:"+folder.uid);name.setTextSize(11);name.setOnClickListener(v->openFolder(folder,card));card.addView(name,new FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP));return card;
+        TextView name=text(folder.name+(count>0?"  · "+count:""));name.setTag("folder-badge:"+folder.uid);Design.caption(name);name.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);name.setPadding(dp(16),0,dp(12),0);card.setOnClickListener(v->openFolder(folder,card));card.addView(name,new FrameLayout.LayoutParams(-1,dp(20),Gravity.TOP));return card;
     }
     private void folderCell(GridLayout grid,View v){GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=0;lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);lp.rowSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);grid.addView(v,lp);}
     private List<GridModel.Item> rankedChildren(GridModel.Item folder){List<GridModel.Item> result=new ArrayList<>(folder.children);result.sort(Comparator.comparingDouble((GridModel.Item i)->{ComponentName c=ComponentName.unflattenFromString(i.component);return c==null?0:usage.score(c.getPackageName());}).reversed());return result;}
     private void openFolder(GridModel.Item folder,View origin){
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(20),dp(16),dp(20),dp(16));Glass.apply(body);
-        TextView name=text(folder.name);name.setTextSize(22);name.setOnClickListener(v->rename(folder));body.addView(name);
+        TextView name=text(folder.name);Design.type(name,22,28,500);name.setMinHeight(dp(48));name.setOnClickListener(v->rename(folder));body.addView(name);
         ScrollView scroll=new ScrollView(this);GridLayout grid=new GridLayout(this);grid.setColumnCount(4);
-        for(GridModel.Item child:rankedChildren(folder)){View icon=shortcutView(child,true);icon.setOnLongClickListener(v->{appMenu(v,catalog.find(child.component),child);return true;});enableDragTouch(icon,new DragPayload(child,null));GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=dp(100);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);grid.addView(icon,lp);}
-        scroll.addView(grid);body.addView(scroll);folderPopup=new PopupWindow(body,Math.max(dp(240),stage.getWidth()-dp(32)),Math.min(dp(440),stage.getHeight()/2),true);folderPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));folderPopup.setOutsideTouchable(true);
-        int[] loc=new int[2];origin.getLocationOnScreen(loc);body.setPivotX(Math.max(0,Math.min(body.getWidth(),loc[0])));body.setPivotY(loc[1]);
-        folderPopup.showAtLocation(stage,Gravity.CENTER,0,0);if(android.animation.ValueAnimator.areAnimatorsEnabled()){body.setScaleX(.85f);body.setScaleY(.85f);body.setAlpha(0);body.animate().scaleX(1).scaleY(1).alpha(1).setDuration(180).start();}
+        for(GridModel.Item child:rankedChildren(folder)){View icon=shortcutView(child,true);icon.setOnLongClickListener(v->{appMenu(v,catalog.find(child.component),child);return true;});enableDragTouch(icon,new DragPayload(child,null));GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=canvas.cellHeight();lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);grid.addView(icon,lp);}
+        scroll.addView(grid);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));Design.panel(body);int folderHeight=Math.min(Math.min(dp(440),stage.getHeight()/2),dp(80)+Math.max(1,(folder.children.size()+3)/4)*canvas.cellHeight());folderPopup=new PopupWindow(body,Math.max(dp(240),stage.getWidth()-dp(32)),folderHeight,true);folderPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));folderPopup.setOutsideTouchable(true);
+        int[] loc=new int[2];origin.getLocationOnScreen(loc);loc[0]+=origin.getWidth()/2;loc[1]+=origin.getHeight()/2;
+        if(android.animation.ValueAnimator.areAnimatorsEnabled()){
+            body.setScaleX(.96f);body.setScaleY(.96f);body.setAlpha(0);
+            body.addOnLayoutChangeListener(new View.OnLayoutChangeListener(){public void onLayoutChange(View view,int l,int t,int r,int b,int ol,int ot,int or,int ob){
+                if(r<=l||b<=t)return;body.removeOnLayoutChangeListener(this);int[] position=new int[2];body.getLocationOnScreen(position);
+                body.setPivotX(Math.max(0,Math.min(body.getWidth(),loc[0]-position[0])));body.setPivotY(Math.max(0,Math.min(body.getHeight(),loc[1]-position[1])));
+                body.animate().scaleX(1).scaleY(1).alpha(1).setDuration(220).setInterpolator(Motion.EFFECTS).start();
+            }});
+        }
+        folderPopup.showAtLocation(stage,Gravity.CENTER,0,0);
         Haptics.tick(origin,store.prefs.getInt("haptics",2));
     }
     private void rename(GridModel.Item folder){EditText input=new EditText(this);input.setSingleLine();input.setText(folder.name);input.selectAll();
@@ -168,9 +176,9 @@ public final class HomeActivity extends Activity {
         if(item.kind.equals("shortcut"))getSystemService(LauncherApps.class).startShortcut(component.getPackageName(),item.shortcutId,null,null,android.os.Process.myUserHandle());
         else getSystemService(LauncherApps.class).startMainActivity(component,android.os.Process.myUserHandle(),null,null);
     }catch(RuntimeException e){toast("This app or shortcut is unavailable.");}}
-    private void updateGrid(){if(bottom==null||drawer==null)return;int row=GridMetrics.row(this,root.getHeight()-root.getPaddingTop()-bottom.getPaddingBottom());if(canvas.gridRow==row)return;canvas.gridRow=row;canvas.requestLayout();if(bottom.getChildCount()>1){View icons=bottom.getChildAt(1);icons.getLayoutParams().height=row;icons.requestLayout();}drawer.setGridRow(row);}
+    private void updateGrid(){if(bottom==null||drawer==null||canvas.editing)return;int row=GridMetrics.row(this,root.getHeight()-root.getPaddingTop()-bottom.getPaddingBottom());if(canvas.gridRow==row)return;canvas.gridRow=row;canvas.requestLayout();if(bottom.getChildCount()>1){View icons=bottom.getChildAt(1);icons.getLayoutParams().height=row;icons.requestLayout();}drawer.setGridRow(row);}
     private void renderDock(){if(bottom==null||catalog==null)return;if(touchingDock||contextGesture){dockRefreshPending=true;return;}dockRefreshPending=false;bottom.removeAllViews();
-        FrameLayout hint=new FrameLayout(this);Button search=button("Search apps",()->openDrawer(true,true));search.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search,0,0,0);search.setCompoundDrawablePadding(dp(8));search.setTextSize(15);search.setTextColor(Glass.ink(this));search.setPadding(dp(18),0,dp(18),0);search.setMinHeight(0);search.setMinimumHeight(0);Glass.control(search);FrameLayout.LayoutParams pill=new FrameLayout.LayoutParams(dp(170),dp(36),Gravity.CENTER);hint.addView(search,pill);bottom.addView(hint,new LinearLayout.LayoutParams(-1,dp(44)));
+        FrameLayout hint=new FrameLayout(this);Button search=button("Search apps",()->openDrawer(true,true));search.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search,0,0,0);search.setCompoundDrawablePadding(dp(8));search.setTextSize(15);search.setTextColor(Glass.ink(this));search.setPadding(dp(18),0,dp(18),0);search.setMinHeight(0);search.setMinimumHeight(0);Glass.control(search);FrameLayout.LayoutParams pill=new FrameLayout.LayoutParams(Math.min(stage.getWidth()>0?stage.getWidth()-dp(32):dp(260),Math.max(dp(176),Math.round(dp(176)*getResources().getConfiguration().fontScale))),dp(48),Gravity.CENTER);hint.addView(search,pill);bottom.addView(hint,new LinearLayout.LayoutParams(-1,dp(52)));
         LinearLayout dock=new LinearLayout(this);List<AppCatalog.Entry> entries=catalog.dock(usage);Map<String,Integer> counts=NotificationRepository.counts();
         for(int i=0;i<4;i++){
             View tile;if(i<entries.size()){
@@ -189,15 +197,13 @@ public final class HomeActivity extends Activity {
     private void revealDrawer(float amount){drawerReveal=amount;drawer.setReveal(amount,dockBounds());}
     void openDrawer(boolean keyboard){openDrawer(keyboard,false);}
     void openDrawer(boolean keyboard,boolean searchOnly){
-        if(drawer.isOpen()){if(keyboard)drawer.open(true);return;}beginDrawer(searchOnly);revealDrawer(0);animateDrawer(true);if(keyboard)drawer.open(true);
+        if(drawer.isOpen()){animateDrawer(true);if(keyboard)drawer.open(true);return;}beginDrawer(searchOnly);revealDrawer(0);animateDrawer(true);if(keyboard)drawer.open(true);
     }
     private void animateDrawer(boolean opening){
-        if(drawerMotion!=null)drawerMotion.cancel();if(opening&&!drawer.isOpen())beginDrawer();
-        if(!opening)drawer.hideKeyboard();float target=opening?1:0;
-        if(!android.animation.ValueAnimator.areAnimatorsEnabled()){revealDrawer(target);if(!opening)closeDrawer();return;}
-        drawerMotion=android.animation.ValueAnimator.ofFloat(drawerReveal,target);drawerMotion.setDuration(Math.max(80,Math.round(300*Math.abs(target-drawerReveal))));
-        drawerMotion.setInterpolator(new android.view.animation.PathInterpolator(.2f,0,0,1));drawerMotion.addUpdateListener(a->revealDrawer((float)a.getAnimatedValue()));
-        drawerMotion.addListener(new android.animation.AnimatorListenerAdapter(){boolean cancelled;public void onAnimationCancel(android.animation.Animator a){cancelled=true;}public void onAnimationEnd(android.animation.Animator a){if(!cancelled&&!opening)closeDrawer();}});drawerMotion.start();
+        if(opening&&!drawer.isOpen())beginDrawer();
+        if(!opening)drawer.hideKeyboard();
+        if(drawerMotion==null)drawerMotion=new Motion.Spring(drawerReveal,this::revealDrawer,()->{if(drawerReveal==0&&drawer.isOpen())closeDrawer();});
+        drawerMotion.to(opening?1:0);
     }
     void closeDrawer(){if(drawerMotion!=null){drawerMotion.cancel();drawerMotion=null;}drawer.reset();drawerReveal=0;drawer.setTranslationY(0);canvas.setVisibility(View.VISIBLE);bottom.setAlpha(1);if(surfaceBlurs!=null)surfaceBlurs.active(foreground);Glass.backdrop(getWindow(),canvas,false);contextGesture=false;}
     private final class DockSurface extends LinearLayout{
@@ -220,7 +226,14 @@ public final class HomeActivity extends Activity {
         menu.addView(button("Add to Home",()->{contextPopup.dismiss();addHome(entry);enterEditing();}));
         if(homeItem!=null)menu.addView(button("Remove from Home",()->{removeItem(homeItem);contextPopup.dismiss();}));
         menu.addView(button("App Info",()->{contextPopup.dismiss();startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+entry.packageName)));}));
-        contextPopup=new PopupWindow(menu,dp(250),-2,false);contextPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));contextPopup.setOutsideTouchable(true);contextPopup.setOnDismissListener(()->{contextGesture=false;canvas.manipulating=false;if(dockRefreshPending)bottom.post(()->renderDock());});contextPopup.showAsDropDown(source);
+        Design.panel(menu);contextPopup=new PopupWindow(menu,dp(250),-2,false);contextPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));contextPopup.setOutsideTouchable(true);contextPopup.setOnDismissListener(()->{contextGesture=false;canvas.manipulating=false;if(dockRefreshPending)bottom.post(()->renderDock());});android.graphics.Insets safe=stage.getRootWindowInsets().getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime());
+        int menuWidth=Math.min(dp(280),stage.getWidth()-dp(32)),available=stage.getHeight()-safe.top-safe.bottom-dp(16);
+        menu.measure(View.MeasureSpec.makeMeasureSpec(menuWidth,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(Math.max(dp(48),available),View.MeasureSpec.AT_MOST));
+        contextPopup.setWidth(menuWidth);contextPopup.setHeight(menu.getMeasuredHeight());contextPopup.setIsClippedToScreen(true);
+        int[] anchor=new int[2];source.getLocationOnScreen(anchor);int below=anchor[1]+source.getHeight()+dp(8),above=anchor[1]-menu.getMeasuredHeight()-dp(8);
+        int x=Math.max(safe.left+dp(8),Math.min(stage.getWidth()-safe.right-menuWidth-dp(8),anchor[0]+source.getWidth()/2-menuWidth/2));
+        int y=below+menu.getMeasuredHeight()<=stage.getHeight()-safe.bottom-dp(8)?below:Math.max(safe.top+dp(8),above);
+        contextPopup.showAtLocation(stage,Gravity.TOP|Gravity.LEFT,x,y);
         Haptics.tick(source,store.prefs.getInt("haptics",2));
     }
     private List<String> pinKeys(){List<String> keys=new ArrayList<>();try{org.json.JSONArray json=new org.json.JSONArray(store.prefs.getString("dockPins","[]"));for(int i=0;i<json.length();i++)keys.add(json.getString(i));}catch(org.json.JSONException ignored){}return keys;}
@@ -254,15 +267,17 @@ public final class HomeActivity extends Activity {
         menu.addView(button("Remove from Home",()->{dialog.dismiss();removeItem(item);}));dialog.setOnShowListener(d->{contextGesture=true;canvas.manipulating=true;});dialog.setOnDismissListener(d->{contextGesture=false;canvas.manipulating=false;});dialog.show();
     }
     private void enterEditing(){setEditing(true);}
-    void setEditing(boolean editing){if(canvas.editing==editing)return;canvas.persistPosition();canvas.editing=editing;bottom.setVisibility(editing?View.GONE:View.VISIBLE);
+    void setEditing(boolean editing){if(canvas.editing==editing)return;canvas.persistPosition();canvas.editing=editing;bottom.setVisibility(editing?View.GONE:View.VISIBLE);root.setPadding(root.getPaddingLeft(),editing?0:stage.getRootWindowInsets().getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()|WindowInsets.Type.displayCutout()).top,root.getPaddingRight(),editing?bottom.getPaddingBottom():0);getWindow().setNavigationBarColor(editing?Design.surface(this):Color.TRANSPARENT);getWindow().getInsetsController().setSystemBarsAppearance(editing&&!Glass.dark(this)?WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS:0,WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         if(editing){
             getWindow().getInsetsController().hide(WindowInsets.Type.statusBars());editingScroll=new ScrollView(this);editingScroll.setVerticalScrollBarEnabled(false);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);editingScroll.addView(body);
             int height=Math.max(dp(400),stage.getHeight());stage.removeView(root);body.addView(root,new LinearLayout.LayoutParams(-1,height));
-            editingControls=new LinearLayout(this);Button addWidget=button("Widgets",this::chooseWidget);Button apps=button("Apps",()->openDrawerForEditing());Button settings=button("Settings ↓",()->editingScroll.smoothScrollTo(0,height));Button done=button("Done",()->setEditing(false));
-            editingControls.addView(addWidget,new LinearLayout.LayoutParams(0,dp(52),1));editingControls.addView(apps,new LinearLayout.LayoutParams(0,dp(52),1));editingControls.addView(settings,new LinearLayout.LayoutParams(0,dp(52),1));editingControls.addView(done,new LinearLayout.LayoutParams(0,dp(52),1));
+            editingControls=new LinearLayout(this);editingControls.setOrientation(LinearLayout.VERTICAL);LinearLayout actions=new LinearLayout(this);
+            Button addWidget=button("Widgets",this::chooseWidget),apps=button("Apps",()->openDrawerForEditing()),items=button("Items",this::manageItems),done=button("Done",()->setEditing(false));
+            for(Button action:new Button[]{addWidget,apps,items,done})actions.addView(action,new LinearLayout.LayoutParams(0,dp(52),1));Design.panel(actions);editingControls.addView(actions,new LinearLayout.LayoutParams(-1,dp(52)));
+            Button settings=button("Launcher Settings ↓",()->editingScroll.smoothScrollTo(0,height));Design.control(settings);editingControls.setBackgroundColor(Design.surface(this));editingControls.addView(settings,new LinearLayout.LayoutParams(-1,dp(48)));
             TextView remove=text("Remove");remove.setPadding(0,dp(16),0,dp(16));remove.setOnDragListener((v,e)->{if(!(e.getLocalState()instanceof DragPayload))return false;if(e.getAction()==DragEvent.ACTION_DROP){GridModel.Item item=((DragPayload)e.getLocalState()).item;if(item!=null)removeItem(item);}v.setBackgroundColor(e.getAction()==DragEvent.ACTION_DRAG_ENTERED?0xCCBE6464:0x55444444);return true;});root.addView(remove);root.addView(editingControls);
-            Button items=button("Items",this::manageItems);editingControls.addView(items,new LinearLayout.LayoutParams(0,dp(52),1));
             editingSettings=new SettingsPanel(this,this::settingsChanged);body.addView(editingSettings);stage.addView(editingScroll,0,new FrameLayout.LayoutParams(-1,-1));
+            editingScroll.post(()->{if(editingScroll==null||!canvas.editing)return;int[] position=new int[2],parent=new int[2];root.getLocationOnScreen(position);stage.getLocationOnScreen(parent);root.getLayoutParams().height=Math.max(dp(400),stage.getHeight()-Math.max(0,position[1]-parent[1]));root.requestLayout();});
         }else{
             canvas.moveMode=false;canvas.manipulating=false;canvas.onManipulate=null;canvas.dropColumn=-1;canvas.extraColumns=0;
             getWindow().getInsetsController().show(WindowInsets.Type.statusBars());resizeSelection=null;
@@ -350,7 +365,7 @@ public final class HomeActivity extends Activity {
     }
     TextView text(String content) {
         TextView text = new TextView(this); text.setText(content); text.setGravity(Gravity.CENTER);
-        text.setTextColor(Glass.ink(this));text.setShadowLayer(dp(1),0,0,0x40000000);
+        Design.type(text,14,20,400);text.setTextColor(Glass.ink(this));text.setShadowLayer(.7f*getResources().getDisplayMetrics().density,0,0,0x80000000);
         text.setSoundEffectsEnabled(false); return text;
     }
     Button button(String label, Runnable action) {

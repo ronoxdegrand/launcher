@@ -1,0 +1,4 @@
+s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+PASS reading contrast in both themes, >=48dp Home search target, shared grid, actual dock-to-search icon travel, interruption without position jump, settled spring and screenshots.

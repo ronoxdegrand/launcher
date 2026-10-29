@@ -1,11 +1,11 @@
-v0.2.4
+v0.2.5
 
-Home, dock, search, results and category grids share one seven-row/four-column layout. Search fills one row at the top; its horizontal results share an outlined area. Category tiles and Home folders use the same hairline outline. Home has a prominent search pill with an icon.
+A cohesive design pass informed by current Android and Material guidance: clearer typography roles, consistent spacing, quieter outlines and smaller notification badges. App labels keep icon centers aligned; larger text settings are respected.
 
-Stronger compositor blur uses a slight light/dark veil. Dock blur receives its final bounds before being shown. Search and the drawer blur wallpaper only; Home widgets and shortcuts are hidden beneath them. Text shadows are lighter and typography uses Android's native sans-serif system family.
+The dock icons now travel into the horizontal search row. Opening and closing use an interruptible spring that preserves movement when reversed. Reduced-motion settings are honored, and no animation frame loop remains when idle.
 
-Fuzzy search now handles misspelled partial words, including “masse” for Messages, while exact matches retain priority.
+Search has a stronger visual hierarchy and tonal backing. Category cards and Home folders have consistent gutters and captions. Search and collapse controls have larger touch areas.
 
-Notification expansion preserves the visible row. Incoming events wait for active scrolling to settle; native scrolling and fling remain intact. Background refresh cannot take search focus.
+Settings and menus use readable light/dark surfaces, aligned action rows and correct system-bar contrast. Native system fonts and original app icons remain.
 
-A separate main/pull-request build checks lint and compiles the APK and device tests. The historical v0.2.0 release failure came from a removed SDK tools package; later release builds passed.
+Notification groups, titles, body text and timestamps have clearer hierarchy and spacing. Newly expanded previews fade in while normal scrolling and stable viewport anchoring are preserved.
