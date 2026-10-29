@@ -1,0 +1,18 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: CN=ronoxdegrand Launcher, O=Personal, C=IN
+V2 Signer: certificate SHA-256 digest: b935b1709073b08321c04d71a2decb6f3b714dd477d48cfd07781d26c8cbeb32
+V2 Signer: certificate SHA-1 digest: eab125eb899683dc84a992dfb1807c30d9a9e506
+V2 Signer: certificate MD5 digest: 44c7989e86fe0a14e9309be2bf490ba1
+V2 Signer: key algorithm: RSA
+V2 Signer: key size (bits): 4096
+V2 Signer: public key SHA-256 digest: 8bd8bedaf5f312ab7de45ba5a52764735c36a17366460e1aaaeb632996bff401
+V2 Signer: public key SHA-1 digest: 32c8435bfd37ed665793d7dc80d1adb0ebcc1196
+V2 Signer: public key MD5 digest: 3de37414d0096b9338bacd3b1be6e495

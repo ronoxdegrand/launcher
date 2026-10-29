@@ -2,7 +2,7 @@
 
 ## Current preview
 
-Package `dev.glgra.launcher`, version 0.2.4 (code 2004); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The published signed release is 188,617 bytes (approximately 184 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
+Package `dev.glgra.launcher`, version 0.2.5 (code 2005); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The published signed release is 195,793 bytes (approximately 191 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
 
 `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 24 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
 
@@ -92,3 +92,5 @@ The measured design runner passes in normal, dark, 1.3 font-scale and animation-
 The full integration suite passes with normal compositor blur and with Android-confirmed disabled blur, restored afterward. It includes native long-press dragging from dock and nonempty search, keyboard entry modes, HOME reset, stable regional blur bounds and real read-only notifications. The dedicated scrolling runner passes group/text expansion, small bidirectional drags and incoming events during touch. A settled five-second rendering observation reports zero frames. These are emulator observations; One UI/S23 appearance, motion and performance remain device acceptance.
 
 Debug, instrumentation and signed release builds pass. Lint has zero errors and 24 warnings. No runtime dependency, permission, font download, wallpaper capture or background service was added by the design pass.
+
+The [main build](https://github.com/ronoxdegrand/launcher/actions/runs/40860502011) and [v0.2.5 signed release](https://github.com/ronoxdegrand/launcher/actions/runs/40860508925) completed successfully. The downloaded public APK is 195,793 bytes, SHA-256 `32b4ccd4ebd4dceb2e9304c6d8e08c1762bac228adc2e6a4651f3374492d8529`. Independent checksum and pinned-certificate verification pass. That published APK is installed as a compatible update in the visible emulator, preserving its real layout and settings. The temporary folder used for design proof was never persisted.
