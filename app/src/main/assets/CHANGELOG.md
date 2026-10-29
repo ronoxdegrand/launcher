@@ -1,9 +1,11 @@
-v0.2.3
+v0.2.4
 
-Search opens at the top for every entry point. Dismissing the keyboard after a Home swipe or dock drag reveals the app drawer. After the Home Search button, it stays in search. Home closes all launcher overlays.
+Home, dock, search, results and category grids share one seven-row/four-column layout. Search fills one row at the top; its horizontal results share an outlined area. Category tiles and Home folders use the same hairline outline. Home has a prominent search pill with an icon.
 
-Real regional compositor blur replaces white palette fills on the dock and notification panel. The drawer keeps true system backdrop blur with neutral tint. Dock glass reaches behind the navigation bar; the notification panel's left edge is square. Android-disabled blur has a neutral readable fallback.
+Stronger compositor blur uses a slight light/dark veil. Dock blur receives its final bounds before being shown. Search and the drawer blur wallpaper only; Home widgets and shortcuts are hidden beneath them. Text shadows are lighter and typography uses Android's native sans-serif system family.
 
-Context menus are dismissed on leaving Home so detached menus cannot block later gestures.
+Fuzzy search now handles misspelled partial words, including “masse” for Messages, while exact matches retain priority.
 
-Optional local notification companion apps provide grouped, long, hidden-content, image, ongoing, finite progress and temporary non-dismissible CallStyle examples. Companions are separate emulator tools, not part of the launcher APK. Progress on Android 14 is not a system-promoted Live Update.
+Notification expansion preserves the visible row. Incoming events wait for active scrolling to settle; native scrolling and fling remain intact. Background refresh cannot take search focus.
+
+A separate main/pull-request build checks lint and compiles the APK and device tests. The historical v0.2.0 release failure came from a removed SDK tools package; later release builds passed.

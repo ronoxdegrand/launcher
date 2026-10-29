@@ -124,6 +124,7 @@ public final class NotificationDemo extends Activity {
             }
             return START_NOT_STICKY;
         }
+        @Override public void onTimeout(int startId) { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); }
         @Override public IBinder onBind(Intent intent) { return null; }
         @Override public void onDestroy() { timer.removeCallbacks(expire); stopForeground(STOP_FOREGROUND_REMOVE); super.onDestroy(); }
     }    private static void progress(Context context, BroadcastReceiver.PendingResult pending) {

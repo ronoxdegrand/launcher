@@ -11,8 +11,8 @@ import android.widget.*;
 final class AppTile extends LinearLayout {
     final TextView title;
     AppTile(Context context, AppCatalog.Entry entry, int count, boolean named) {
-        super(context); setOrientation(VERTICAL); setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        setPadding(0, Glass.dp(context,8),0,Glass.dp(context,6)); setMinimumHeight(Glass.dp(context,88));
+        super(context); setOrientation(VERTICAL); setGravity(Gravity.CENTER);
+        setPadding(0, Glass.dp(context,8),0,Glass.dp(context,6)); setMinimumHeight(0);
         setContentDescription(entry.label); setSoundEffectsEnabled(false);
         FrameLayout image=new FrameLayout(context);
         ImageView icon=new ImageView(context);
@@ -26,7 +26,7 @@ final class AppTile extends LinearLayout {
             FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(Glass.dp(context,count>99?29:24),Glass.dp(context,24),Gravity.TOP|Gravity.RIGHT);image.addView(badge,bp);
         }
         title=new TextView(context);title.setText(entry.label);title.setTextSize(12);title.setTextColor(Glass.ink(context));
-        title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setIncludeFontPadding(false);title.setShadowLayer(Glass.dp(context,2),0,Glass.dp(context,1),0xAA000000);
+        title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setIncludeFontPadding(false);title.setShadowLayer(Glass.dp(context,1),0,0,0x40000000);
         LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,-2);tp.topMargin=Glass.dp(context,4);addView(title,tp);
         title.setAlpha(named?1:0);setClipChildren(false);
     }

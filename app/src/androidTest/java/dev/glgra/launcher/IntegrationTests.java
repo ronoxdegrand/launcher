@@ -119,6 +119,7 @@ public final class IntegrationTests extends Instrumentation {
         passed("Nested layout, folder names, stable IDs and shortcut identity persistence");
     }
     private void catalog() {
+        SearchMatchTests.verify();
         AppCatalog catalog = new AppCatalog(getTargetContext()); catalog.reload();
         check(!catalog.all().isEmpty(), "Installed apps discovered");
         check(AppCatalog.match("calnedar", "calendar") < 10000, "Adjacent-letter typo is searchable");
@@ -207,6 +208,7 @@ public final class IntegrationTests extends Instrumentation {
         main(()->home.canvas.setPosition(0));
         if(Glass.blurAvailable(home))awaitUi(()->home.surfaceBlurs.visibleCount()==2,5000,"Native dock and notification blur regions did not appear");else main(()->check(home.surfaceBlurs.visibleCount()==0,"Blur-disabled mode leaves no regional blur windows visible"));
         saveDesignShot("modern-home");
+        main(()->{check(home.bottom.getChildAt(1).getHeight()==home.canvas.cellHeight(),"Dock shares Home row height");check(home.canvas.cellHeight()*6<=home.canvas.getHeight(),"Six Home rows fit viewport");});
         int[] dockCenters=new int[4];
         main(()->{LinearLayout dock=(LinearLayout)home.bottom.getChildAt(1);for(int i=0;i<4;i++){View tile=dock.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);dockCenters[i]=point[0]+tile.getWidth()/2;}});
         main(() -> home.openDrawer(true));
@@ -217,6 +219,8 @@ public final class IntegrationTests extends Instrumentation {
         main(()->{LinearLayout strip=field(home.drawer,"results");check(strip.getOrientation()==LinearLayout.HORIZONTAL&&strip.getChildCount()==4,"Empty search preserves a horizontal four-app dock");
             int top=-1;for(int i=0;i<4;i++){View tile=strip.getChildAt(i);int[] point=new int[2];tile.getLocationOnScreen(point);check(Math.abs(point[0]+tile.getWidth()/2-dockCenters[i])<=2,"Search app retains its dock column");if(top<0)top=point[1];check(point[1]==top,"All default results share a horizontal row");check(tile instanceof AppTile&&((AppTile)tile).title.getAlpha()==1,"Search result names are revealed");}
             check(((home.getWindow().getAttributes().flags&android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)!=0)==Glass.blurAvailable(home),"Backdrop blur follows Android support/state");});
+        main(()->{check(home.canvas.getVisibility()==View.INVISIBLE,"Only wallpaper sits behind search blur");check(home.drawer.search.getHeight()==home.canvas.cellHeight(),"Search occupies one shared row");});
+        main(()->{NotificationPanel panel=field(home,"notificationPanel");if(panel!=null)panel.refresh();check(home.drawer.search.hasFocus(),"Background notification refresh cannot steal search focus");});
         saveDesignShot("modern-search");
         int[] searchTop=new int[1];main(()->{int[] point=new int[2];home.drawer.search.getLocationOnScreen(point);searchTop[0]=point[1];check(point[1]<home.stage.getHeight()/3,"Search is at the top, not attached to the IME");});
         main(() -> { home.drawer.search.setText(target.label); check(home.drawer.isOpen(), "Typing keeps drawer open");
@@ -224,10 +228,12 @@ public final class IntegrationTests extends Instrumentation {
             home.drawer.search.setText(""); home.drawer.search.onEditorAction(EditorInfo.IME_ACTION_GO); check(home.drawer.isOpen(), "Enter with empty query does nothing");
             home.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(home.drawer.search.getWindowToken(), 0); home.drawer.search.clearFocus(); });
         awaitUi(() -> ((LinearLayout) field(home.drawer, "categories")).getVisibility() == View.VISIBLE, 5000, "Keyboard dismissal did not reveal categories");
+        saveDesignShot("modern-categories");
         main(() -> {
             check((Boolean)field(home.drawer,"browsing"),"Gesture entry reveals drawer after keyboard dismissal");
             int[] point=new int[2];home.drawer.search.getLocationOnScreen(point);check(Math.abs(point[1]-searchTop[0])<=2,"Keyboard dismissal does not move the top search bar");
             LinearLayout categories = field(home.drawer, "categories"); check(categories.getChildCount() > 0, "Categorized app grid populated");
+            LinearLayout pair=(LinearLayout)categories.getChildAt(0);check(pair.getChildAt(0).getHeight()==2*home.canvas.cellHeight(),"Category occupies two shared grid rows");
             TextView more = findText(categories, "+", true);
             if (more != null) { more.performClick(); check(!((String) field(home.drawer, "expanded")).isEmpty(), "Category expands inline"); }
             home.closeDrawer(); check(!home.drawer.isOpen() && home.drawer.getVisibility() == View.GONE, "Drawer closes");
@@ -247,7 +253,26 @@ public final class IntegrationTests extends Instrumentation {
         awaitUi(()->!home.drawer.isOpen(),5000,"Home intent did not leave gesture search");
         main(()->{int[] origin=new int[2];home.bottom.getLocationOnScreen(origin);check(origin[1]+home.bottom.getHeight()==home.stage.getHeight(),"Dock glass extends behind the navigation bar");
             NotificationPanel panel=field(home,"notificationPanel");if(panel!=null){float[] corners=((android.graphics.drawable.GradientDrawable)panel.getBackground()).getCornerRadii();check(corners[0]==0&&corners[1]==0&&corners[6]==0&&corners[7]==0&&corners[2]>0,"Notification panel is square at the left boundary");}});
-        passed("Drawer search/focus/IME, empty Enter, keyboard-dismissed categories and reset-on-close");
+        if(Glass.blurAvailable(home)){
+            for(int repeat=0;repeat<3;repeat++){
+                main(()->home.openDrawer(false));
+                awaitUi(()->(Float)field(home,"drawerReveal")>=.999f,5000,"Drawer transition did not settle");
+                main(home::closeDrawer);
+                awaitUi(()->blurBoundsMatch(home),5000,"Dock blur bounds did not recover after drawer transition");
+            }
+            main(()->home.canvas.setPosition(home.canvas.cellWidth()));
+            awaitUi(()->blurBoundsMatch(home),5000,"Dock blur bounds changed during Home scroll");
+            main(()->home.canvas.setPosition(0));
+        }
+        passed("Shared Home/dock/search/category grid; wallpaper-only search; stable dock blur bounds across drawer transitions and Home scrolling; focus/IME and Home reset");
+    }
+    private boolean blurBoundsMatch(HomeActivity home){
+        android.app.Dialog[] regions=field(home.surfaceBlurs,"windows");
+        if(regions[0]==null||regions[0].getWindow().getDecorView().getVisibility()!=View.VISIBLE)return false;
+        android.graphics.Rect dock=new android.graphics.Rect(),blur=new android.graphics.Rect();
+        home.bottom.getGlobalVisibleRect(dock);regions[0].getWindow().getDecorView().getGlobalVisibleRect(blur);
+        int[] location=new int[2];regions[0].getWindow().getDecorView().getLocationOnScreen(location);
+        blur.offsetTo(location[0],location[1]);return dock.equals(blur);
     }
     private void transientMenus(HomeActivity home){
         main(()->{LinearLayout dock=(LinearLayout)home.bottom.getChildAt(1);check(dock.getChildAt(0).performLongClick(),"Dock opens context menu");});

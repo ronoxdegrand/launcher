@@ -2,7 +2,7 @@
 
 ## Current preview
 
-Package `dev.glgra.launcher`, version 0.2.3 (code 2003); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The signed release is 184,205 bytes (approximately 180 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
+Package `dev.glgra.launcher`, version 0.2.4 (code 2004); minimum API 34, target API 37, SDK 37.2. Pure Java/framework Views with no runtime library dependencies. The local signed release is 188,553 bytes (approximately 184 KiB). Gradle distribution checksum and the public signing certificate fingerprint are pinned.
 
 `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` and the local signed `assembleRelease` pass. Lint reports 0 errors and 24 warnings; no lint baseline hides errors. Remaining warnings include English-only strings, the intentional portrait phone UI, editor constructors, deprecated compatibility APIs and build-tool notices. Release signature verification checks the expected public certificate, rather than accepting any valid signer.
 
@@ -66,3 +66,15 @@ Three separate companion app packages post real local examples. Each has a summa
 Category discovery also passes: our three companions expose Social/Productivity/Maps through native metadata; only 3 of 15 installed emulator apps provide a native category. See CATEGORIES-AND-DEMOS.md for sources and platform limits. Images and raw results are saved in artifacts; companion APKs are built separately and never included in the launcher release.
 
 The [v0.2.3 workflow](https://github.com/ronoxdegrand/launcher/actions/runs/40758177156) completed successfully. The published APK is 184,205 bytes, SHA-256 `e253a972b07e77869295db27a09c348e30647223f4724ccaeabb5443a216041f`; independent checksum and pinned-certificate verification pass. It is installed as a compatible update in the visible emulator, with the three companion apps reposted. Final review also fixed and tested stale context-menu cleanup on stop/destroy. Navigation-bar contrast enforcement is disabled after decor creation and in the theme, allowing the dock surface to continue behind the controls.
+
+## Shared grid, blur stability, fuzzy prefixes and notification scrolling · 0.2.4
+
+The seven-row/four-column metric is shared by Home, the dock, the one-row top search bar, horizontal results and two-row category cards. Home folders use the same outlined area. Home now has an icon-bearing search pill. Regional blur receives final geometry before showing; radius is 48dp capped at 150px, with a slight theme-aware veil and one-pixel outline. Home content is invisible beneath the drawer, leaving wallpaper alone behind its compositor blur. Font shadows are reduced and the font family is the native Android sans-serif.
+
+The integrated suite checks measured row/column alignment, two-row categories, hidden Home content, background notification refresh preserving search focus, repeated drawer/blur-window restoration, and stable dock bounds during Home scrolling. Fuzzy matching includes 15 bounded regression cases for partial-word typos, transpositions, accents, unrelated inputs and exact-match priority. Native long-press drags, Home intents, keyboard entry modes and read-only notification checks remain covered. Normal compositor blur and Android-confirmed disabled blur are checked separately.
+
+A separate measured notification runner passes with 14 real owned notifications: group and long-text expansion preserve the viewport, slow bidirectional swipes move locally without endpoint jumps, and an incoming event during touch preserves the gesture. It leaves native notifications active and removes only its own fixtures afterward. Native ScrollView fling is retained.
+
+The widget suite passes all seven checks, including ordinary system binding consent, provider configuration, persistence, cancellation cleanup, RemoteViews taps and gesture interception. Its first attempts encountered a remembered binding grant and skipped the expected consent dialog; explicitly revoking the emulator user-0 grant restored the consent path. One integrated run timed out waiting for Home focus during concurrent build work; that observation is retained here and is not evidence of a resolved device-specific cause.
+
+Local debug/device-test/release compilation and lint pass with zero errors and 24 warnings. The private release identity still matches the pinned public certificate. The optional companion service now also stops on the Android short-service timeout callback; it has no persistent service or network work. Main and pull-request CI now compile debug/device-test APKs and run lint without signing secrets; tags retain the separate signed-release pipeline.

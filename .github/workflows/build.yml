@@ -1,0 +1,35 @@
+name: Android build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
+      - name: Check and build debug APK and device tests
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon lintDebug assembleDebug assembleDebugAndroidTest

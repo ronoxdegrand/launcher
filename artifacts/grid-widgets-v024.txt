@@ -1,0 +1,16 @@
+PASS 250 varied grid placements, collision avoidance, oversized widths and bounds
+PASS Home viewport, layout persistence and repeated Home
+PASS Horizontal scrolling, column snap and fixed left edge
+PASS Real widget allocation, binding, configuration and persistence
+PASS Widget native tap and horizontal gesture interception
+PASS Configuration cancellation releases widget ID
+PASS Vertical child gesture preserved without horizontal canvas movement
+
+PASS 250 varied grid placements, collision avoidance, oversized widths and bounds
+PASS Home viewport, layout persistence and repeated Home
+PASS Horizontal scrolling, column snap and fixed left edge
+PASS Real widget allocation, binding, configuration and persistence
+PASS Widget native tap and horizontal gesture interception
+PASS Configuration cancellation releases widget ID
+PASS Vertical child gesture preserved without horizontal canvas movement
+All foundation tests passed.

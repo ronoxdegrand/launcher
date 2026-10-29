@@ -134,15 +134,29 @@ final class AppCatalog {
         if (compactLabel.startsWith(compactQuery)) return 11;
         // One- and two-character queries use partial matching, not indiscriminate fuzzy matches.
         if (compactQuery.length() < 3) return 10000;
-        int allowed = compactQuery.length() < 6 ? 1 : Math.min(3, compactQuery.length() / 3);
+        int allowed = compactQuery.length() < 5 ? 1 : compactQuery.length() < 9 ? 2 : 3;
         int best = distance(compactQuery, compactLabel, allowed);
         for (String word : label.split(" ")) best = Math.min(best, distance(compactQuery, word, allowed));
         if (best <= allowed) return 100 + best * 10;
+        // Typing is normally incomplete: compare against nearby prefix lengths as well as full words.
+        // Charging edits against that prefix avoids penalizing the as-yet untyped suffix.
+        int prefix = prefixDistance(compactQuery, compactLabel, allowed);
+        for (String word : label.split(" ")) prefix = Math.min(prefix, prefixDistance(compactQuery, word, allowed));
+        if (prefix <= allowed) return 140 + prefix * 10;
         int at = 0;
         for (int i = 0; i < compactLabel.length() && at < compactQuery.length(); i++)
             if (compactLabel.charAt(i) == compactQuery.charAt(at)) at++;
         if (at == compactQuery.length() && compactLabel.length() <= compactQuery.length() * 2) return 200;
         return 10000;
+    }
+    private static int prefixDistance(String query, String label, int limit) {
+        if (query.length() > 128) return limit + 1;
+        int best = limit + 1;
+        int first = Math.max(2, query.length() - limit), last = Math.min(label.length(), query.length() + limit);
+        for (int length = first; length <= last; length++) {
+            best = Math.min(best, distance(query, label.substring(0, length), limit));
+        }
+        return best;
     }
     /** Bounded Damerau-Levenshtein, including adjacent transpositions. */
     private static int distance(String a, String b, int limit) {

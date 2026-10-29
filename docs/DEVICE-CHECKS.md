@@ -15,3 +15,5 @@ Record Android/One UI version, navigation mode and provider versions alongside r
 11. Test gesture Home/Recents and app switching. Record animation differences from One UI Home; privileged animation parity is not promised.
 12. Verify signed update with newer compatible APK: Wi-Fi automatic download, cellular/Wi-Fi loss behavior, progress and changelog, hash/signature/package rejection, native unknown-source/installer consent, retained widgets/settings after install. Failed downloads wait until the next scheduled check.
 13. Leave idle and profile actual CPU/GPU/frame activity, memory and battery on the S23. No specific battery/memory claim is accepted without measurement.
+
+For 0.2.4, specifically compare dock blur while scrolling and returning from the drawer; verify the seven-row/four-column alignment at the S23's actual display/font scale. Confirm only wallpaper appears behind search, and try a typo prefix such as “masse” for Messages. Expand a long notification from the top and halfway down, then make small drags in both directions while new notifications arrive; the viewport should remain local.

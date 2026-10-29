@@ -42,7 +42,8 @@ final class HomeCanvas extends ViewGroup {
         emptyLongPress = () -> { if (emptyGesture && !horizontal && !vertical && onEdit != null) onEdit.run(); };
     }
     int cellWidth() { return Math.max(1, getWidth() / 4); }
-    int cellHeight() { return Math.max(1, getHeight() / 6); }
+    int gridRow;
+    int cellHeight() { return gridRow>0?gridRow:Math.max(1, getHeight() / 6); }
     int maxScroll() { return Math.max(0, (model.columns()+extraColumns) * cellWidth() - getWidth()); }
     void attach(View view, GridModel.Item item) { view.setTag(item); addView(view); }
     @Override protected void onMeasure(int w, int h) {

@@ -37,11 +37,12 @@ final class SurfaceBlur implements AutoCloseable {
             window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
             window.setDecorFitsSystemWindows(false);window.setBackgroundDrawable(Glass.shape(activity,index==0?Glass.DOCK:Glass.NOTIFICATIONS,0x01000000));
             WindowManager.LayoutParams params=window.getAttributes();params.token=activity.getWindow().getDecorView().getWindowToken();params.gravity=Gravity.TOP|Gravity.LEFT;params.windowAnimations=0;params.setFitInsetsTypes(0);window.setAttributes(params);
-            window.setBackgroundBlurRadius(Glass.dp(activity,28));windows[index]=dialog;
+            window.setBackgroundBlurRadius(Glass.radius(activity));windows[index]=dialog;
         }
         Dialog dialog=windows[index];
-        if(!dialog.isShowing()||dialog.getWindow().getDecorView().getVisibility()!=View.VISIBLE)dialog.show();
         if(!bounds.equals(previous[index])){Window window=dialog.getWindow();WindowManager.LayoutParams params=window.getAttributes();params.x=bounds.left;params.y=bounds.top;params.width=bounds.width();params.height=bounds.height();window.setAttributes(params);previous[index].set(bounds);}
+        // Attach only after final geometry is known; otherwise the dock flashes at default bounds.
+        if(!dialog.isShowing()||dialog.getWindow().getDecorView().getVisibility()!=View.VISIBLE)dialog.show();
     }
     public void close(){active=false;if(root.getViewTreeObserver().isAlive()){root.getViewTreeObserver().removeOnGlobalLayoutListener(layout);root.getViewTreeObserver().removeOnScrollChangedListener(scroll);}for(Dialog window:windows)if(window!=null)window.dismiss();}
 }

@@ -6,8 +6,8 @@ A widget-first launcher for Android 14 and later, built with native Android view
 
 Install signed `launcher.apk` from [GitHub Releases](https://github.com/ronoxdegrand/launcher/releases). The installed Launcher icon opens Settings; **Open Home** previews the canvas. Select it as the default Home app through Android.
 
-- Swipe horizontally on the continuous four-column, six-row canvas. It snaps to columns and remembers its position.
-- Swipe up, drag the dock up, or tap Search to open search at the top. Results stay horizontal; swipe sideways for additional matches. Dismissing the keyboard after a swipe/drag reveals categories. Dismissing it after the Search button keeps search open. Android Home returns to Home from any launcher overlay.
+- Swipe horizontally on the continuous four-column, six-row canvas. The dock adds a seventh shared row, with a separate search pill. Scrolling snaps to columns and remembers its position.
+- Swipe up, drag the dock up, or tap Search to open search at the top. Search occupies one full grid row and shares an outline with its horizontal results; swipe sideways for additional matches. Dismissing the keyboard after a swipe/drag reveals categories. Dismissing it after the Search button keeps search open. Android Home returns to Home from any launcher overlay.
 - Long-press empty Home to edit. Add widgets/apps, move and resize items, or scroll down to settings.
 - Long-press apps for native shortcuts, pinning, Add to Home and App Info. Continue dragging to place an app on Home; drop one app onto another to create a folder.
 - Usage access enables adaptive ranking; notification access enables read-only notification previews. Both are optional. Hidden apps remain searchable by name.
@@ -53,3 +53,9 @@ The updater binds APK downloads to validated Wi-Fi and checks checksum, package,
 [MIT license](LICENSE), copyright 2026 ronoxdegrand.
 
 For a local notification playground and category research, see [categories and demos](docs/CATEGORIES-AND-DEMOS.md). The three optional companion apps are separate from the launcher and need no network, accounts or real messages.
+
+## Package identity
+
+`dev.glgra.launcher` is the existing Android application ID and Java namespace, including component, provider and internal intent prefixes. `glgra` is a historical namespace label, not a Windows account lookup, login requirement or path used by the app. Build tools use configurable SDK/JDK locations. Renaming the published application ID would create a separate installation and break the existing update path.
+
+The main/pull-request workflow compiles the debug APK and device tests and runs lint without signing secrets. Version tags run the separate signed-release workflow.

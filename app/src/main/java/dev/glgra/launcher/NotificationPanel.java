@@ -17,6 +17,7 @@ import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -51,8 +52,18 @@ public final class NotificationPanel extends ScrollView {
     private final Set<String> requested = new HashSet<>();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable observer = this::refresh;
+    private final Map<String, View> rows = new LinkedHashMap<>();
+    private Viewport pendingViewport;
+    private boolean touching, refreshPending, disposed;
+    private long lastScroll;
+    private final Runnable refreshWhenQuiet = () -> {
+        if (!refreshPending || disposed || touching) return;
+        long remaining = 160 - (android.os.SystemClock.uptimeMillis() - lastScroll);
+        if (remaining > 0) main.postDelayed(this.refreshWhenQuiet, remaining);
+        else { refreshPending = false; rebuild(); }
+    };
     private ExecutorService decoder;
-    private boolean disposed;
+
     private int generation;
     private final String emptyMessage;
 
@@ -60,6 +71,7 @@ public final class NotificationPanel extends ScrollView {
         super(context);
         setVerticalScrollBarEnabled(false); setHorizontalScrollBarEnabled(false);
         setFillViewport(true); setSoundEffectsEnabled(false); setClipToOutline(true);
+        setFocusableInTouchMode(true); setDescendantFocusability(FOCUS_BEFORE_DESCENDANTS);
         GradientDrawable surface = new GradientDrawable();
         surface.setColor(dark() ? 0xCF20292B : 0xDDF5F8F7); surface.setCornerRadius(dp(22)); setBackground(surface);
         body = new LinearLayout(context); body.setOrientation(LinearLayout.VERTICAL);
@@ -73,13 +85,14 @@ public final class NotificationPanel extends ScrollView {
         super.onAttachedToWindow(); if (getWindowVisibility() == View.VISIBLE) NotificationRepository.addListener(observer); refresh();
     }
     @Override protected void onDetachedFromWindow() {
-        NotificationRepository.removeListener(observer); super.onDetachedFromWindow();
+        cancelDeferredRefresh(); NotificationRepository.removeListener(observer); super.onDetachedFromWindow();
     }
     @Override protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
         if (body == null || disposed) return;
         if (visibility == View.VISIBLE) { NotificationRepository.addListener(observer); refresh(); }
         else {
+            cancelDeferredRefresh(); pendingViewport = null;
             NotificationRepository.removeListener(observer); groups.clear(); messages.clear(); media.clear();
             generation++; requested.clear();
             if (decoder != null) { decoder.shutdownNow(); decoder = null; }
@@ -87,17 +100,32 @@ public final class NotificationPanel extends ScrollView {
         }
     }
     public void reset() {
-        groups.clear(); messages.clear(); media.clear(); scrollTo(0, 0); refresh();
+        cancelDeferredRefresh(); pendingViewport = null;
+        groups.clear(); messages.clear(); media.clear(); scrollTo(0, 0); rebuild();
     }
     public void dispose() {
         disposed = true; generation++; NotificationRepository.removeListener(observer);
+        cancelDeferredRefresh(); pendingViewport = null;
         if (decoder != null) decoder.shutdownNow();
         thumbnails.evictAll(); requested.clear(); mediaViews.clear(); mediaVersions.clear(); appNames.clear(); appIcons.clear();
     }
     public void refresh() {
         if (Looper.myLooper() != Looper.getMainLooper()) { main.post(this::refresh); return; }
         if (disposed || (isAttachedToWindow() && getWindowVisibility() != View.VISIBLE)) return;
-        int oldScroll = getScrollY(); body.removeAllViews(); mediaViews.clear();
+        // Keep existing touch targets alive until a drag or native fling has settled.
+        if (touching || android.os.SystemClock.uptimeMillis() - lastScroll < 160) {
+            refreshPending = true; main.removeCallbacks(refreshWhenQuiet);
+            if (!touching) main.postDelayed(refreshWhenQuiet, 160);
+            return;
+        }
+        rebuild();
+    }
+    private void rebuild() {
+        if (disposed) return;
+        if (pendingViewport == null) pendingViewport = captureViewport();
+        // Removed focused descendants otherwise ask ScrollView to reveal their replacements.
+        if (isInTouchMode() && hasFocus()) requestFocus();
+        body.removeAllViews(); rows.clear(); mediaViews.clear();
         if (!NotificationRepository.accessGranted(getContext())) {
             body.addView(text("Your notifications, at a glance.", 16));
             Button access = new Button(getContext()); access.setText("Enable notification previews"); access.setAllCaps(false);
@@ -125,7 +153,63 @@ public final class NotificationPanel extends ScrollView {
             empty.setGravity(Gravity.CENTER); empty.setPadding(0, dp(26), 0, dp(26)); body.addView(empty);
         }
         for (Map.Entry<String, List<StatusBarNotification>> entry : byApp.entrySet()) addGroup(entry.getKey(), entry.getValue());
-        body.post(() -> { if (!disposed) scrollTo(0, oldScroll); });
+    }
+    private static final class Viewport {
+        final String key; final int offset, scroll;
+        Viewport(String key, int offset, int scroll) { this.key = key; this.offset = offset; this.scroll = scroll; }
+    }
+    private int contentTop(View view) {
+        int top = 0;
+        while (view != this) {
+            top += view.getTop();
+            if (!(view.getParent() instanceof View)) break;
+            view = (View) view.getParent();
+        }
+        return top;
+    }
+    private Viewport captureViewport() {
+        int scroll = getScrollY();
+        for (Map.Entry<String, View> entry : rows.entrySet()) {
+            View row = entry.getValue(); int top = contentTop(row);
+            if (top + row.getHeight() > scroll)
+                return new Viewport(entry.getKey(), scroll - top, scroll);
+        }
+        return new Viewport(null, 0, scroll);
+    }
+    @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        Viewport viewport = pendingViewport; pendingViewport = null;
+        if (viewport != null) {
+            View anchor = rows.get(viewport.key);
+            int position = anchor == null ? viewport.scroll : contentTop(anchor)
+                    + Math.min(viewport.offset, Math.max(0, anchor.getHeight() - 1));
+            scrollTo(0, position);
+        }
+    }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            touching = true; pendingViewport = null; main.removeCallbacks(refreshWhenQuiet);
+        }
+        boolean handled = super.dispatchTouchEvent(event);
+        if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+            touching = false;
+            if (refreshPending) main.postDelayed(refreshWhenQuiet, 160);
+        }
+        return handled;
+    }
+    @Override protected void onScrollChanged(int x, int y, int oldX, int oldY) {
+        super.onScrollChanged(x, y, oldX, oldY);
+        lastScroll = android.os.SystemClock.uptimeMillis();
+        if (refreshPending && !touching) {
+            main.removeCallbacks(refreshWhenQuiet); main.postDelayed(refreshWhenQuiet, 160);
+        }
+    }
+    private void cancelDeferredRefresh() {
+        touching = false; refreshPending = false; main.removeCallbacks(refreshWhenQuiet);
+    }
+    private void refreshPreview() {
+        if (isInTouchMode()) requestFocus();
+        refreshPending = false; main.removeCallbacks(refreshWhenQuiet); rebuild();
     }
     private void addGroup(String packageName, List<StatusBarNotification> records) {
         LinearLayout section = new LinearLayout(getContext()); section.setOrientation(LinearLayout.VERTICAL);
@@ -140,8 +224,9 @@ public final class NotificationPanel extends ScrollView {
         header.setContentDescription(appName(packageName) + ", " + records.size() + " active notifications, " + (groups.contains(packageName) ? "expanded" : "collapsed"));
         header.setOnClickListener(v -> {
             if (!groups.add(packageName)) groups.remove(packageName);
-            Haptics.tick(v, new LayoutStore(getContext()).prefs.getInt("haptics", 2)); refresh();
+            Haptics.tick(v, new LayoutStore(getContext()).prefs.getInt("haptics", 2)); refreshPreview();
         });
+        rows.put("group:" + packageName, header);
         section.addView(header);
         if (groups.contains(packageName)) for (StatusBarNotification record : records) addMessage(section, record);
         LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(-1, -2); sectionParams.bottomMargin = dp(8);
@@ -168,11 +253,12 @@ public final class NotificationPanel extends ScrollView {
         if (!title.isEmpty()) { TextView heading = text(title, 14); heading.setTypeface(null, android.graphics.Typeface.BOLD); row.addView(heading); }
         TextView content = text(full.isEmpty() ? "Content hidden" : full, 14);
         content.setMaxLines(messages.contains(key) ? Integer.MAX_VALUE : 3); content.setEllipsize(TextUtils.TruncateAt.END);
-        content.setOnClickListener(v -> { if (!messages.add(key)) messages.remove(key); refresh(); });
+        content.setOnClickListener(v -> { if (!messages.add(key)) messages.remove(key); refreshPreview(); });
         row.addView(content);
         TextView timestamp = text(relative(record.getPostTime()), 11); timestamp.setAlpha(.6f); timestamp.setPadding(0, dp(4), 0, 0); row.addView(timestamp);
         if (!hidden) addMedia(row, record);
         section.addView(row);
+        rows.put("notification:" + key, row);
     }
     private void addMedia(LinearLayout row, StatusBarNotification record) {
         String key = record.getKey(); Bundle extras = record.getNotification().extras;
@@ -192,7 +278,7 @@ public final class NotificationPanel extends ScrollView {
         preview.setImageResource(android.R.drawable.ic_menu_gallery);
         preview.setContentDescription(media.contains(key) ? "Collapse image preview" : "Expand image preview");
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(media.contains(key) ? 240 : 68)); params.topMargin = dp(7); row.addView(preview, params);
-        preview.setSoundEffectsEnabled(false); preview.setOnClickListener(v -> { if (!media.add(key)) media.remove(key); refresh(); });
+        preview.setSoundEffectsEnabled(false); preview.setOnClickListener(v -> { if (!media.add(key)) media.remove(key); refreshPreview(); });
         Bitmap cached = thumbnails.get(key);
         if (cached != null) { preview.setImageBitmap(cached); return; }
         if (!requested.add(key)) return;
@@ -292,7 +378,7 @@ public final class NotificationPanel extends ScrollView {
     }
     private TextView text(String value, int size) {
         TextView text = new TextView(getContext()); text.setText(value); text.setTextSize(size);
-        text.setTextColor(Glass.ink(getContext()));text.setShadowLayer(dp(2),0,dp(1),0xAA000000); text.setSoundEffectsEnabled(false); return text;
+        text.setTextColor(Glass.ink(getContext()));text.setShadowLayer(dp(1),0,0,0x40000000); text.setSoundEffectsEnabled(false); return text;
     }
     private boolean dark() { return (getResources().getConfiguration().uiMode & 0x30) == 0x20; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

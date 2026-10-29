@@ -39,3 +39,11 @@ Reference: [Android public window blur guidelines](https://source.android.com/do
 ## Regional blur update · 0.2.3
 
 The earlier wallpaper-color fallback is replaced on Home by public, non-focusable and non-touchable TYPE_APPLICATION_MEDIA child windows behind the activity. Their background blur regions follow the notification panel's visible rectangle and the dock including navigation-bar space. Window.setBackgroundBlurRadius supplies the actual backdrop pixels; the main views contain only a neutral translucent tint. The parent activity keeps normal lifecycle behaviour. Child windows are hidden on Home stop/drawer opening/blur disable, repositioned only on layout/scroll changes, and dismissed on destruction. This requires no system-overlay permission or wallpaper-pixel access. Android/One UI can still disable compositor blur, so a neutral readable fallback remains necessary.
+
+## Shared grid and frosted surfaces · 0.2.4
+
+One row metric is calculated from usable display height after system bars, a 44dp Home search affordance and a 20dp continuation gap, then divided into seven rows. Home reserves six rows and the dock one; the drawer uses that same metric without shrinking it when the keyboard opens. Its top search row and horizontal results share one outlined region; categories and Home folder previews use the same area outline. Surplus drawer height reveals part of the next row when content exists.
+
+Blur radius is now 48dp, capped at 150 physical pixels, with a slight white veil in light mode or black veil in dark mode and a one-physical-pixel outline. Regional windows receive final bounds before first show or restoration. During search/drawer presentation the Home canvas is invisible (measured geometry retained), and its RenderEffect is cleared: the compositor sees only wallpaper behind the drawer. No wallpaper capture or periodic rendering is introduced.
+
+Notification refresh anchors the first visible row through rebuilds, restores during layout, and defers incoming-event rebuilds until touch/fling has settled. Explicit local preview changes remain immediate. Only an already-focused notification panel preserves its focus during background refresh, so it cannot take focus from search. Native ScrollView fling remains in use.
